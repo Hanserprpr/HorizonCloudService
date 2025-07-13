@@ -1,0 +1,23 @@
+# docker-compose.env.yaml
+# 本地测试环境搭建
+
+version: "2.4"
+
+networks:
+  activity-punch-system-backend-net:
+    driver: bridge
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: activity-punch-system-backend-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 12345678
+      MYSQL_DATABASE: activity-punch-system-backend
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    privileged: true
+    restart: always
+    networks:
+      - activity-punch-system-backend-net
