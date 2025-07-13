@@ -29,10 +29,10 @@ func Get() *slog.Logger {
 			// 在 release 模式下输出到文件，并启用日志轮转
 			lumberjackLogger := &lumberjack.Logger{
 				Filename:   cfg.Log.FilePath,
-				MaxSize:    100, // MB
-				MaxBackups: 3,   // 保留的旧日志文件数
-				MaxAge:     28,  // 保留天数
-				Compress:   true,
+				MaxSize:    cfg.Log.MaxSize,
+				MaxBackups: cfg.Log.MaxBackups,
+				MaxAge:     cfg.Log.MaxAge,
+				Compress:   cfg.Log.Compress,
 			}
 			handler = slog.NewJSONHandler(lumberjackLogger, opts)
 		} else {

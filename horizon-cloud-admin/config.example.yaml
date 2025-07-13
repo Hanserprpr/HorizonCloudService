@@ -16,20 +16,34 @@ Mode: "debug"
 
 # MySQL 数据库配置
 Mysql:
-    # 数据库主机地址，例如 "127.0.0.1" 表示本地数据库
+    # 数据库主机地址，例如 "horizon-cloud-admin-mysql" 表示 Docker 容器名
     Host: "127.0.0.1"
-    
+
     # 数据库端口号，例如 "3306" 为 MySQL 默认端口
-    Port: "3306"
-    
+    Port: "3309"
+
     # 数据库用户名，用于身份验证
     Username: "root"
-    
+
     # 数据库密码，用于身份验证
     Password: "12345678"
-    
+
     # 数据库名称，指定连接的数据库
     DBName: "horizon-cloud-admin-db"
+
+# Redis 配置
+Redis:
+    # Redis 主机地址，例如 "horizon-cloud-admin-redis" 表示 Docker 容器名
+    Host: "127.0.0.1"
+
+    # Redis 端口号，例如 "6379" 为 Redis 默认端口
+    Port: "6379"
+
+    # Redis 密码，用于身份验证（与 docker-compose 中一致）
+    Password: "12345678"
+
+    # Redis 数据库编号，0 为默认数据库
+    DB: 0
 
 # 日志配置
 log:

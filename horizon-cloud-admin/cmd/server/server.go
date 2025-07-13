@@ -8,6 +8,7 @@ import (
 	"horizon-cloud-admin/internal/global/httpclient"
 	"horizon-cloud-admin/internal/global/logger"
 	"horizon-cloud-admin/internal/global/middleware"
+	"horizon-cloud-admin/internal/global/redis"
 	"horizon-cloud-admin/internal/module"
 	"horizon-cloud-admin/tools"
 	"log/slog"
@@ -18,10 +19,16 @@ var log *slog.Logger
 func Init() {
 	config.Init()
 	log = logger.New("Server")
+	log.Info(fmt.Sprintf("Init Config: %s", config.Get().Mode))
 
 	database.Init()
+	log.Info(fmt.Sprintf("Init Database: %s", config.Get().Mysql.Host))
+
+	redis.Init()
+	log.Info(fmt.Sprintf("Init Redis: %s", config.Get().Redis.Host))
 
 	httpclient.Init()
+	log.Info(fmt.Sprintf("Init HttpClient: %s", config.Get().Host))
 
 	for _, m := range module.Modules {
 		log.Info(fmt.Sprintf("Init Module: %s", m.GetName()))

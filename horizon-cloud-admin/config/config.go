@@ -13,6 +13,7 @@ type Config struct {
 	Prefix string `envconfig:"PREFIX"`
 	Mode   Mode   `envconfig:"MODE"`
 	Mysql  Mysql
+	Redis  Redis
 	JWT    JWT
 	Log    Log
 }
@@ -23,6 +24,13 @@ type Mysql struct {
 	Username string `envconfig:"USERNAME"`
 	Password string `envconfig:"PASSWORD"`
 	DBName   string `envconfig:"DB_NAME"`
+}
+
+type Redis struct {
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	Password string `yaml:"password"`
+	DB       int    `yaml:"db"`
 }
 
 type JWT struct {

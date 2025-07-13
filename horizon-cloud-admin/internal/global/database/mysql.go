@@ -27,7 +27,6 @@ func Init() {
 		config.Get().Mysql.Port,
 		config.Get().Mysql.DBName,
 	)
-
 	gormConfig := &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{SingularTable: true}, // 还是单数表名好
 	}
