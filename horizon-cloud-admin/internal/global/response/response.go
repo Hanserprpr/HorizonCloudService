@@ -2,9 +2,10 @@ package response
 
 import (
 	"fmt"
+	"horizon-cloud-admin/config"
+
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
-	"horizon-cloud-admin/config"
 )
 
 // ResponseBody 定义了 HTTP 响应的标准 JSON 结构
@@ -33,6 +34,7 @@ func Success(c *gin.Context, data ...any) {
 	if len(data) > 0 {
 		response.Data = data[0]
 	}
+	c.JSON(200, response)
 }
 
 // Fail 发送错误 HTTP 响应，并终止请求处理
@@ -58,8 +60,13 @@ func Fail(c *gin.Context, err error) {
 	if config.IsDebug() {
 		response.Origin = e.Origin
 	}
+
 	// 将错误对象存储到 gin 上下文中，便于后续处理（如日志记录）
 	c.Set(ErrorContextKey, *e)
+
+	// 发送 JSON 错误响应
+	c.JSON(int(e.Code), response)
+
 	// 终止请求处理链
 	c.Abort()
 }
