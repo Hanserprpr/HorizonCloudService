@@ -23,6 +23,6 @@ func (u *ModuleUser) InitRouter(r *gin.RouterGroup) {
 	userGroup.Use(middleware.Auth(1))
 	{
 		// 注册获取用户信息端点，处理获取用户信息请求
-		userGroup.GET("/change-password", ChangePassword)
+		userGroup.POST("/change-password", ChangePassword)
 	}
 }

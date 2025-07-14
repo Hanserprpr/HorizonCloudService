@@ -9,13 +9,13 @@ import (
 	"horizon-cloud-admin/internal/global/response"
 	"horizon-cloud-admin/internal/model"
 	"horizon-cloud-admin/tools"
+	"strings"
 )
 
 // User 定义登录和注册请求的结构体
 type User struct {
 	StudentID string `json:"student_id" binding:"required"` // 学号，唯一标识用户
 	Password  string `json:"password" binding:"required"`   // 密码，登录时验证，注册时加密
-	NickName  string `json:"nick_name" binding:"required"`  // 用户昵称
 }
 
 // ChangePasswordReq 定义修改密码请求的结构体
@@ -58,7 +58,6 @@ func Login(c *gin.Context) {
 	// 记录登录成功的日志
 	log.Info("用户登录成功",
 		"student_id", user.StudentID,
-		"nick_name", user.NickName,
 		"role_id", user.RoleID)
 
 	// 生成 JWT 令牌并返回用户信息
@@ -68,17 +67,69 @@ func Login(c *gin.Context) {
 			RoleID:    user.RoleID,
 		}),
 		"student_id": user.StudentID,
-		"nick_name":  user.NickName,
 		"role_id":    user.RoleID,
 	})
+}
+
+// validatePasswordStrength 验证密码强度
+func validatePasswordStrength(password string) error {
+	if password == "" {
+		return errors.New("密码不能为空")
+	}
+	if len(password) < 8 {
+		return errors.New("密码长度必须至少8字符")
+	}
+
+	// 检查是否包含至少一个字母
+	hasLetter := false
+	// 检查是否包含至少一个数字
+	hasDigit := false
+	// 检查是否包含至少一个特殊字符
+	hasSpecial := false
+	specialChars := "!@#$%^&*-"
+
+	for _, char := range password {
+		switch {
+		case strings.ContainsRune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", char):
+			hasLetter = true
+		case strings.ContainsRune("0123456789", char):
+			hasDigit = true
+		case strings.ContainsRune(specialChars, char):
+			hasSpecial = true
+		}
+	}
+
+	if !hasLetter {
+		return errors.New("密码必须包含至少一个字母")
+	}
+	if !hasDigit {
+		return errors.New("密码必须包含至少一个数字")
+	}
+	if !hasSpecial {
+		return errors.New("密码必须包含至少一个特殊字符（!@#$%^&*）")
+	}
+
+	return nil
+}
+
+type registerReq struct {
+	User
+	NickName string `json:"nick_name" binding:"required"`
 }
 
 // Register 处理用户注册请求
 func Register(c *gin.Context) {
 	// 定义请求结构体并绑定 JSON 数据
-	var req User
+	var req registerReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Error("绑定注册请求失败", "error", err, "student_id", req.StudentID)
+		response.Fail(c, response.ErrInvalidRequest.WithOrigin(err))
+		return
+	}
+
+	// 验证密码强度
+	if err := validatePasswordStrength(req.Password); err != nil {
+		log.Warn("密码强度验证失败", "error", err, "student_id", req.StudentID)
 		response.Fail(c, response.ErrInvalidRequest.WithOrigin(err))
 		return
 	}
@@ -122,11 +173,7 @@ func Register(c *gin.Context) {
 		"role_id", user.RoleID)
 
 	// 返回成功响应
-	response.Success(c, map[string]interface{}{
-		"student_id": user.StudentID,
-		"nick_name":  user.NickName,
-		"role_id":    user.RoleID,
-	})
+	response.Success(c)
 }
 
 // ChangePassword 处理用户修改密码请求
@@ -140,7 +187,7 @@ func ChangePassword(c *gin.Context) {
 		response.Fail(c, response.ErrUnauthorized)
 		return
 	}
-	userPayload, ok := payload.(jwt.Payload)
+	userPayload, ok := payload.(*jwt.Claims)
 	if !ok {
 		response.Fail(c, response.ErrUnauthorized)
 		return
@@ -150,6 +197,13 @@ func ChangePassword(c *gin.Context) {
 	var req ChangePasswordReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Error("绑定修改密码请求失败", "error", err, "student_id", userPayload.StudentID)
+		response.Fail(c, response.ErrInvalidRequest.WithOrigin(err))
+		return
+	}
+
+	// 验证新密码强度
+	if err := validatePasswordStrength(req.NewPassword); err != nil {
+		log.Warn("新密码强度验证失败", "error", err, "student_id", userPayload.StudentID)
 		response.Fail(c, response.ErrInvalidRequest.WithOrigin(err))
 		return
 	}
