@@ -3,6 +3,7 @@ package response
 import (
 	"fmt"
 	"horizon-cloud-admin/config"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -18,6 +19,8 @@ type ResponseBody struct {
 	Origin string `json:"origin,omitempty"`
 	// Data 是响应的数据内容，对于成功响应包含实际数据，错误响应通常为 null
 	Data any `json:"data,omitempty"`
+	// Timestamp 响应时间戳
+	Timestamp int64 `json:"timestamp,omitempty"`
 }
 
 // Success 发送成功的 HTTP 响应，状态码为 200
@@ -26,10 +29,10 @@ type ResponseBody struct {
 //   - data: 可选的数据内容，第一个参数会被设置为 ResponseBody.Data
 func Success(c *gin.Context, data ...any) {
 	response := ResponseBody{
-		// 使用预定义的成功状态码和消息（假设 success 是一个 *Error 类型常量）
-		Code: success.Code,
-		Msg:  success.Message,
-		Data: nil,
+		Code:      success.Code,
+		Msg:       success.Message,
+		Data:      nil,
+		Timestamp: time.Now().Unix(),
 	}
 	if len(data) > 0 {
 		response.Data = data[0]
@@ -55,6 +58,7 @@ func Fail(c *gin.Context, err error) {
 	// 设置响应状态码和消息
 	response.Code = e.Code
 	response.Msg = e.Message
+	response.Timestamp = time.Now().Unix()
 
 	// 在 debug 模式下，添加错误来源信息
 	if config.IsDebug() {
