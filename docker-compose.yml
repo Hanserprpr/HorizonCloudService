@@ -1,0 +1,278 @@
+# 智能媒体云存储系统 - 开发环境
+# 微服务架构 Docker Compose 配置
+
+version: '3.8'
+
+networks:
+  horizon-cloud-net:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  postgres_data:
+  redis_data:
+  minio_data:
+  qdrant_data:
+
+services:
+  # =============================================================================
+  # 数据层 (Data Layer)
+  # =============================================================================
+  
+  # MySQL - 用户数据
+  mysql:
+    image: mysql:8.0
+    container_name: horizon-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 12345678
+      MYSQL_DATABASE: horizon_cloud_users
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./shared/database/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped
+
+  # PostgreSQL - 文件元数据 + pgvector
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: horizon-postgres
+    environment:
+      POSTGRES_DB: horizon_cloud_files
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345678
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped
+
+  # Redis Cluster - 缓存和消息队列
+  redis:
+    image: redis:7.2-alpine
+    container_name: horizon-redis
+    command: redis-server --requirepass 12345678 --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped
+
+  # MinIO - 对象存储
+  minio:
+    image: minio/minio:latest
+    container_name: horizon-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: 12345678
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped
+
+  # Qdrant - 向量数据库
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: horizon-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped
+
+  # =============================================================================
+  # API网关层 (Gateway Layer)
+  # =============================================================================
+
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    container_name: horizon-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=12345678
+    volumes:
+      - ./services/gateway/config:/app/config
+    depends_on:
+      - redis
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped
+
+  # =============================================================================
+  # 微服务层 (Service Layer)
+  # =============================================================================
+
+  # 用户管理服务
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: horizon-user-service
+    ports:
+      - "8081:8081"
+    environment:
+      - DATABASE_HOST=mysql
+      - DATABASE_PASSWORD=12345678
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=12345678
+    volumes:
+      - ./services/user-service/config:/app/config
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped
+
+  # 文件管理服务
+  file-service:
+    build:
+      context: ./services/file-service
+      dockerfile: Dockerfile
+    container_name: horizon-file-service
+    ports:
+      - "8083:8083"
+    environment:
+      - DATABASE_HOST=postgres
+      - DATABASE_PASSWORD=12345678
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=12345678
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=12345678
+    volumes:
+      - ./services/file-service/config:/app/config
+    depends_on:
+      - postgres
+      - minio
+      - redis
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped
+
+  # AI处理服务
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    container_name: horizon-ai-service
+    ports:
+      - "8084:8084"
+    environment:
+      - DATABASE_HOST=postgres
+      - DATABASE_PASSWORD=12345678
+      - QDRANT_HOST=qdrant
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=12345678
+    volumes:
+      - ./services/ai-service/config:/app/config
+      - ./services/ai-service/python-runtime:/app/python-runtime
+    depends_on:
+      - postgres
+      - qdrant
+      - redis
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped
+
+  # 搜索服务
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+    container_name: horizon-search-service
+    ports:
+      - "8086:8086"
+    environment:
+      - QDRANT_HOST=qdrant
+      - DATABASE_HOST=postgres
+      - DATABASE_PASSWORD=12345678
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=12345678
+    depends_on:
+      - qdrant
+      - postgres
+      - redis
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped
+
+  # =============================================================================
+  # 监控层 (Monitoring Layer)
+  # =============================================================================
+
+  # Prometheus - 指标收集
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: horizon-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus:/etc/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped
+
+  # Grafana - 可视化面板
+  grafana:
+    image: grafana/grafana:latest
+    container_name: horizon-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - ./infrastructure/monitoring/grafana:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped
+
+  # =============================================================================
+  # 前端层 (Frontend Layer)
+  # =============================================================================
+
+  # Nginx - 反向代理和静态文件服务
+  nginx:
+    image: nginx:alpine
+    container_name: horizon-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./infrastructure/nginx/conf.d:/etc/nginx/conf.d
+      - ./frontend/admin-portal/dist:/usr/share/nginx/html/admin
+      - ./frontend/user-gallery/dist:/usr/share/nginx/html/gallery
+    depends_on:
+      - gateway
+    networks:
+      - horizon-cloud-net
+    restart: unless-stopped

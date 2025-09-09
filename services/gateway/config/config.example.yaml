@@ -1,0 +1,62 @@
+# API Gateway 配置文件
+environment: "development"  # development, production
+port: 8080
+
+# Redis 配置 (用于限流和会话管理)
+redis:
+  host: "localhost"
+  port: 6379
+  password: "12345678"
+  db: 0
+
+# JWT 认证配置
+jwt:
+  secret: "your-super-secret-jwt-key-here-32-chars"
+  expires_in: 86400  # 24小时 (秒)
+
+# 微服务配置
+services:
+  user-service:
+    host: "localhost"
+    port: 8081
+    prefix: "/api/v1/users"
+  
+  permission-service:
+    host: "localhost" 
+    port: 8082
+    prefix: "/api/v1/permissions"
+  
+  file-service:
+    host: "localhost"
+    port: 8083
+    prefix: "/api/v1/files"
+  
+  ai-service:
+    host: "localhost"
+    port: 8084
+    prefix: "/api/v1/ai"
+  
+  model-service:
+    host: "localhost"
+    port: 8085
+    prefix: "/api/v1/models"
+  
+  search-service:
+    host: "localhost"
+    port: 8086
+    prefix: "/api/v1/search"
+  
+  share-service:
+    host: "localhost"
+    port: 8087
+    prefix: "/api/v1/shares"
+  
+  notification-service:
+    host: "localhost"
+    port: 8088
+    prefix: "/api/v1/notifications"
+
+# 限流配置
+rate_limit:
+  requests_per_second: 100
+  burst_size: 200
