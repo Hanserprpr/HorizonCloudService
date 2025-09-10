@@ -345,6 +345,9 @@ func (r *Router) setupAdminRoutes(api *gin.RouterGroup) {
 	// 系统统计
 	api.GET("/system/stats", r.handlers.Health.Stats)
 	api.GET("/system/metrics", r.handlers.Health.Metrics)
+	
+	// 管理员文件统计（匹配前端期望的格式）
+	api.GET("/files/stats/storage", r.handlers.File.GetAdminFileStats)
 }
 
 // setupPublicRoutes 设置公共路由

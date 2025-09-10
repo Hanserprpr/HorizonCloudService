@@ -160,6 +160,89 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	SuccessResponse(c, http.StatusOK, "登出成功", nil)
 }
 
+// ValidateToken 验证访问令牌
+// @Summary 验证访问令牌
+// @Description 验证访问令牌的有效性
+// @Tags 认证
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} Response "令牌有效"
+// @Failure 401 {object} Response "令牌无效"
+// @Router /api/v1/auth/validate [get]
+func (h *AuthHandler) ValidateToken(c *gin.Context) {
+	// 从中间件获取用户ID (如果中间件通过了，说明令牌有效)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		ErrorResponse(c, http.StatusUnauthorized, "令牌无效", "无效的访问令牌")
+		return
+	}
+	
+	SuccessResponse(c, http.StatusOK, "令牌有效", gin.H{
+		"user_id": userID,
+		"valid":   true,
+	})
+}
+
+// ChangePassword 修改密码
+// @Summary 修改密码
+// @Description 修改用户密码
+// @Tags 认证
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body ChangePasswordRequest true "修改密码请求"
+// @Success 200 {object} Response "密码修改成功"
+// @Failure 400 {object} Response "请求参数错误"
+// @Failure 401 {object} Response "未授权"
+// @Failure 500 {object} Response "服务器内部错误"
+// @Router /api/v1/users/change-password [post]
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	// 从中间件获取用户ID
+	userID, exists := c.Get("user_id")
+	if !exists {
+		ErrorResponse(c, http.StatusUnauthorized, "未授权", "无效的用户认证")
+		return
+	}
+
+	var req ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ErrorResponse(c, http.StatusBadRequest, "请求参数格式错误", err.Error())
+		return
+	}
+
+	// 验证新密码和确认密码是否一致
+	if req.NewPassword != req.ConfirmPassword {
+		ErrorResponse(c, http.StatusBadRequest, "参数错误", "新密码和确认密码不一致")
+		return
+	}
+
+	// 调用服务层
+	changeReq := &services.ChangePasswordRequest{
+		OldPassword: req.OldPassword,
+		NewPassword: req.NewPassword,
+	}
+
+	err := h.userService.ChangePassword(c.Request.Context(), userID.(uint), changeReq)
+	if err != nil {
+		if err.Error() == "原密码错误" {
+			ErrorResponse(c, http.StatusBadRequest, "密码修改失败", err.Error())
+		} else {
+			ErrorResponse(c, http.StatusInternalServerError, "密码修改失败", err.Error())
+		}
+		return
+	}
+
+	SuccessResponse(c, http.StatusOK, "密码修改成功", nil)
+}
+
+// ChangePasswordRequest 修改密码请求结构
+type ChangePasswordRequest struct {
+	OldPassword     string `json:"old_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required"`
+	ConfirmPassword string `json:"confirm_password" binding:"required"`
+}
+
 // RefreshTokenRequest 刷新令牌请求结构
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`

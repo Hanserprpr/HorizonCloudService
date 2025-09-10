@@ -343,6 +343,15 @@ func (h *FolderHandler) GetFolderContents(c *gin.Context) {
 		return
 	}
 
+	// 从URL路径参数获取文件夹ID
+	folderIDStr := c.Param("id")
+	var folderIDPtr *uint
+	if folderIDStr != "" && folderIDStr != "0" {
+		if folderID, err := h.GetIDParam(c, "id"); err == nil && folderID > 0 {
+			folderIDPtr = &folderID
+		}
+	}
+
 	var req GetFolderContentsRequest
 	if err := h.BindQuery(c, &req); err != nil {
 		h.HandleServiceError(c, err)
@@ -351,7 +360,7 @@ func (h *FolderHandler) GetFolderContents(c *gin.Context) {
 
 	// 构建服务请求
 	serviceReq := &services.GetFolderContentsRequest{
-		FolderID: req.FolderID,
+		FolderID: folderIDPtr,
 		UserID:   userID,
 		Offset:   (req.Page - 1) * req.PageSize,
 		Limit:    req.PageSize,

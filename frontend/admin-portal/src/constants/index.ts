@@ -2,6 +2,7 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 export const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL || 'http://localhost:8001';
 export const FILE_SERVICE_URL = import.meta.env.VITE_FILE_SERVICE_URL || 'http://localhost:8002';
+export const SYSTEM_SERVICE_URL = import.meta.env.VITE_SYSTEM_SERVICE_URL || 'http://localhost:8003';
 
 // 应用配置常量
 export const APP_NAME = import.meta.env.VITE_APP_NAME || '云存储管理后台';

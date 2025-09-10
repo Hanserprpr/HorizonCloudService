@@ -47,6 +47,7 @@ type FileService interface {
 	GetUserStats(ctx context.Context, userID uint) (*UserFileStats, error)
 	GetCategoryStats(ctx context.Context, userID uint) (map[string]int64, error)
 	GetStorageStats(ctx context.Context, userID uint) (*StorageStats, error)
+	GetAdminFileStats(ctx context.Context) (*AdminFileStats, error)
 }
 
 // FolderService 文件夹服务接口
@@ -314,6 +315,21 @@ type StorageStats struct {
 	FileCount       int64            `json:"file_count"`
 	CategoryStats   map[string]int64 `json:"category_stats"`
 	TierStats       map[string]int64 `json:"tier_stats"`
+}
+
+// AdminFileStats 管理员文件统计（前端期望格式）
+type AdminFileStats struct {
+	TotalFiles      int64                    `json:"total_files"`
+	TotalSize       int64                    `json:"total_size"`
+	FilesByType     map[string]int64         `json:"files_by_type"`
+	StorageByUser   []UserStorageInfo       `json:"storage_by_user"`
+}
+
+// UserStorageInfo 用户存储信息（与repository.UserStorageInfo一致）
+type UserStorageInfo struct {
+	UserID      uint   `json:"user_id"`
+	Username    string `json:"username"`
+	StorageUsed int64  `json:"storage_used"`
 }
 
 // 上传服务相关结构体

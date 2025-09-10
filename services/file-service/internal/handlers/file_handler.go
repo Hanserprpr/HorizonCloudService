@@ -551,3 +551,22 @@ func (h *FileHandler) GetStorageStats(c *gin.Context) {
 
 	h.Success(c, stats)
 }
+
+// GetAdminFileStats 获取管理员级别的文件统计（所有用户）
+func (h *FileHandler) GetAdminFileStats(c *gin.Context) {
+	userID := h.RequireAuth(c)
+	if userID == 0 {
+		return
+	}
+
+	// 这里应该检查管理员权限，但目前简化处理
+	// TODO: 添加管理员权限验证
+
+	stats, err := h.services.File.GetAdminFileStats(c.Request.Context())
+	if err != nil {
+		h.HandleServiceError(c, err)
+		return
+	}
+
+	h.Success(c, stats)
+}

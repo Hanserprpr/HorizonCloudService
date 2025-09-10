@@ -282,6 +282,50 @@ func (s *fileService) GetStorageStats(ctx context.Context, userID uint) (*Storag
 	}, nil
 }
 
+// GetAdminFileStats 获取管理员级别的文件统计（所有用户）
+func (s *fileService) GetAdminFileStats(ctx context.Context) (*AdminFileStats, error) {
+	// 获取全系统文件统计
+	totalFiles, err := s.repo.File.GetTotalFileCount(ctx)
+	if err != nil {
+		return nil, NewServiceError("AdminStatsRetrieveFailed", "failed to get total file count", err)
+	}
+
+	// 获取总存储大小
+	totalSize, err := s.repo.File.GetTotalStorageUsed(ctx)
+	if err != nil {
+		return nil, NewServiceError("AdminStatsRetrieveFailed", "failed to get total storage used", err)
+	}
+
+	// 获取按文件类型的统计
+	filesByType, err := s.repo.File.GetGlobalCategoryStats(ctx)
+	if err != nil {
+		return nil, NewServiceError("AdminStatsRetrieveFailed", "failed to get files by type", err)
+	}
+
+	// 获取按用户的存储统计
+	repoStorageByUser, err := s.repo.File.GetUserStorageList(ctx)
+	if err != nil {
+		return nil, NewServiceError("AdminStatsRetrieveFailed", "failed to get storage by user", err)
+	}
+
+	// 转换repository类型到services类型
+	storageByUser := make([]UserStorageInfo, len(repoStorageByUser))
+	for i, repoUser := range repoStorageByUser {
+		storageByUser[i] = UserStorageInfo{
+			UserID:      repoUser.UserID,
+			Username:    repoUser.Username,
+			StorageUsed: repoUser.StorageUsed,
+		}
+	}
+
+	return &AdminFileStats{
+		TotalFiles:    totalFiles,
+		TotalSize:     totalSize,
+		FilesByType:   filesByType,
+		StorageByUser: storageByUser,
+	}, nil
+}
+
 // 高级文件操作
 
 // DuplicateFiles 查找重复文件

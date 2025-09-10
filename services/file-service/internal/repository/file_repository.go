@@ -7,6 +7,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// UserStorageInfo 用户存储信息
+type UserStorageInfo struct {
+	UserID      uint   `json:"user_id"`
+	Username    string `json:"username"`
+	StorageUsed int64  `json:"storage_used"`
+}
+
 // FileRepository 文件仓库接口
 type FileRepository interface {
 	// 基本CRUD操作
@@ -42,6 +49,12 @@ type FileRepository interface {
 	GetUserStorageUsed(ctx context.Context, userID uint) (int64, error)
 	GetCategoryStats(ctx context.Context, userID uint) (map[string]int64, error)
 	GetStorageTierStats(ctx context.Context, userID uint) (map[string]int64, error)
+	
+	// 管理员级别统计
+	GetTotalFileCount(ctx context.Context) (int64, error)
+	GetTotalStorageUsed(ctx context.Context) (int64, error)
+	GetGlobalCategoryStats(ctx context.Context) (map[string]int64, error)
+	GetUserStorageList(ctx context.Context) ([]UserStorageInfo, error)
 	
 	// 批量操作
 	BatchCreate(ctx context.Context, files []*models.File) error
@@ -518,4 +531,90 @@ func (r *fileRepository) CleanupOrphaned(ctx context.Context) (int64, error) {
 		Where("folder_id IS NOT NULL AND folder_id NOT IN (SELECT id FROM file_folders)").
 		Update("folder_id", nil)
 	return result.RowsAffected, result.Error
+}
+
+// ====== 管理员级别统计方法 ======
+
+// GetTotalFileCount 获取全系统文件总数
+func (r *fileRepository) GetTotalFileCount(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&models.File{}).
+		Where("deleted_at IS NULL").
+		Count(&count).Error
+	return count, err
+}
+
+// GetTotalStorageUsed 获取全系统存储使用量
+func (r *fileRepository) GetTotalStorageUsed(ctx context.Context) (int64, error) {
+	var result struct {
+		TotalSize int64
+	}
+	err := r.db.WithContext(ctx).
+		Model(&models.File{}).
+		Where("deleted_at IS NULL").
+		Select("COALESCE(SUM(size), 0) as total_size").
+		Scan(&result).Error
+	return result.TotalSize, err
+}
+
+// GetGlobalCategoryStats 获取全系统按文件类型的统计
+func (r *fileRepository) GetGlobalCategoryStats(ctx context.Context) (map[string]int64, error) {
+	var results []struct {
+		Category string
+		Count    int64
+	}
+	
+	err := r.db.WithContext(ctx).
+		Model(&models.File{}).
+		Where("deleted_at IS NULL").
+		Select("category, COUNT(*) as count").
+		Group("category").
+		Scan(&results).Error
+	if err != nil {
+		return nil, err
+	}
+	
+	stats := make(map[string]int64)
+	for _, result := range results {
+		category := result.Category
+		if category == "" {
+			category = "uncategorized"
+		}
+		stats[category] = result.Count
+	}
+	
+	return stats, nil
+}
+
+// GetUserStorageList 获取用户存储使用列表
+func (r *fileRepository) GetUserStorageList(ctx context.Context) ([]UserStorageInfo, error) {
+	var results []struct {
+		UserID      uint
+		StorageUsed int64
+	}
+	
+	err := r.db.WithContext(ctx).
+		Model(&models.File{}).
+		Where("deleted_at IS NULL").
+		Select("user_id, COALESCE(SUM(size), 0) as storage_used").
+		Group("user_id").
+		Order("storage_used DESC").
+		Limit(100). // 限制返回前100个用户
+		Scan(&results).Error
+	if err != nil {
+		return nil, err
+	}
+	
+	// 转换为UserStorageInfo结构
+	storageList := make([]UserStorageInfo, len(results))
+	for i, result := range results {
+		storageList[i] = UserStorageInfo{
+			UserID:      result.UserID,
+			Username:    "", // 这里需要从用户服务获取用户名，暂时留空
+			StorageUsed: result.StorageUsed,
+		}
+	}
+	
+	return storageList, nil
 }

@@ -1,4 +1,5 @@
-import { apiClient } from './api';
+import axios, { AxiosInstance } from 'axios';
+import { SYSTEM_SERVICE_URL } from '../constants';
 import type { 
   SystemSettings, 
   SystemInfo, 
@@ -7,106 +8,147 @@ import type {
   EmailConfig 
 } from '../types';
 
-export class SettingsService {
-  // Mock数据存储
-  private static mockSettings: SystemSettings = {
-    siteName: '云存储管理后台',
-    defaultUserQuota: 10 * 1024 * 1024 * 1024, // 10GB
-    allowRegistration: true,
-    maxFileSize: 500 * 1024 * 1024, // 500MB
-    supportedFileTypes: [
-      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-      'video/mp4', 'video/avi', 'video/mov',
-      'application/pdf', 'text/plain'
-    ],
-    enableThumbnails: true,
-    thumbnailSizes: ['small', 'medium', 'large'],
-    enableFileVersioning: true,
-    maxFileVersions: 5,
-    enableEmailNotifications: true,
-    emailConfig: {
-      smtpHost: 'smtp.example.com',
-      smtpPort: 587,
-      smtpUser: 'noreply@example.com',
-      smtpPassword: '',
-      smtpSecure: true,
-      fromName: '云存储系统',
-      fromEmail: 'noreply@example.com'
-    },
-    storageConfig: {
-      type: 'local',
-      localPath: './uploads',
-      maxStorageSize: 1024 * 1024 * 1024 * 1024, // 1TB
-      s3Config: {
-        accessKeyId: '',
-        secretAccessKey: '',
-        region: 'us-west-2',
-        bucket: '',
-        endpoint: ''
+// 系统服务API客户端
+class SystemServiceClient {
+  private client: AxiosInstance;
+
+  constructor() {
+    this.client = axios.create({
+      baseURL: SYSTEM_SERVICE_URL,
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    // 请求拦截器 - 添加认证token
+    this.client.interceptors.request.use(
+      (config) => {
+        const token = localStorage.getItem('auth-token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
       }
-    },
-    theme: {
-      primaryColor: '#1677FF',
-      darkMode: false
-    },
-    security: {
-      sessionTimeout: 24 * 60, // 24小时（分钟）
-      enableTwoFactor: false,
-      passwordMinLength: 6,
-      passwordRequireSpecialChar: false
-    }
-  };
+    );
+
+    // 响应拦截器 - 处理错误
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          // Token过期，清除本地存储并跳转到登录页
+          localStorage.removeItem('auth-token');
+          localStorage.removeItem('refresh-token');
+          window.location.href = '/auth/login';
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  // 系统统计信息
+  async getSystemStats() {
+    const response = await this.client.get('/api/v1/system/stats');
+    return response.data;
+  }
+
+  // 系统健康检查
+  async getSystemHealth() {
+    const response = await this.client.get('/api/v1/system/health');
+    return response.data;
+  }
+
+  // 清理缓存
+  async clearCache() {
+    const response = await this.client.post('/api/v1/system/cache/clear');
+    return response.data;
+  }
+
+  // 获取设置
+  async getSettings() {
+    const response = await this.client.get('/api/v1/admin/settings');
+    return response.data;
+  }
+
+  // 更新设置
+  async updateSettings(settings: any) {
+    const response = await this.client.put('/api/v1/admin/settings', { settings });
+    return response.data;
+  }
+
+  // 获取存储设置
+  async getStorageSettings() {
+    const response = await this.client.get('/api/v1/admin/settings/storage');
+    return response.data;
+  }
+
+  // 更新存储设置
+  async updateStorageSettings(settings: any) {
+    const response = await this.client.put('/api/v1/admin/settings/storage', settings);
+    return response.data;
+  }
+
+  // 测试存储设置
+  async testStorageSettings(settings: any) {
+    const response = await this.client.post('/api/v1/admin/settings/test-storage', settings);
+    return response.data;
+  }
+}
+
+// 创建系统服务客户端实例
+const systemClient = new SystemServiceClient();
+
+export class SettingsService {
 
   // 获取系统设置
   static async getSettings(): Promise<SystemSettings> {
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return Promise.resolve(this.mockSettings);
+    try {
+      const response = await systemClient.getSettings();
+      if (response.success) {
+        return this.transformSettingsFromAPI(response.data.settings);
+      }
+      throw new Error(response.message || 'Failed to get settings');
+    } catch (error) {
+      console.error('Failed to get system settings:', error);
+      // 返回默认设置作为后备
+      return this.getDefaultSettings();
+    }
   }
 
   // 更新系统设置
   static async updateSettings(settings: UpdateSettingsRequest): Promise<SystemSettings> {
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // 更新Mock数据
-    this.mockSettings = {
-      ...this.mockSettings,
-      ...settings
-    };
-    
-    return Promise.resolve(this.mockSettings);
+    try {
+      const transformedSettings = this.transformSettingsToAPI(settings);
+      const response = await systemClient.updateSettings(transformedSettings);
+      if (response.success) {
+        return this.transformSettingsFromAPI(response.data?.settings || transformedSettings);
+      }
+      throw new Error(response.message || 'Failed to update settings');
+    } catch (error) {
+      console.error('Failed to update system settings:', error);
+      throw error;
+    }
   }
 
   // 获取系统信息
   static async getSystemInfo(): Promise<SystemInfo> {
-    // Mock系统信息
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return Promise.resolve({
-      version: '1.0.0',
-      buildTime: '2025-01-09T10:00:00Z',
-      startTime: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      serverTime: new Date().toISOString(),
-      uptime: 24 * 60 * 60, // 1天
-      platform: 'linux',
-      nodeVersion: '18.17.0',
-      memoryUsage: {
-        used: 512 * 1024 * 1024, // 512MB
-        total: 2 * 1024 * 1024 * 1024, // 2GB
-        free: 1.5 * 1024 * 1024 * 1024 // 1.5GB
-      },
-      diskUsage: {
-        used: 50 * 1024 * 1024 * 1024, // 50GB
-        total: 500 * 1024 * 1024 * 1024, // 500GB
-        free: 450 * 1024 * 1024 * 1024 // 450GB
-      },
-      services: {
-        database: 'running',
-        storage: 'running',
-        cache: 'running',
-        queue: 'running'
+    try {
+      const statsResponse = await systemClient.getSystemStats();
+      const healthResponse = await systemClient.getSystemHealth();
+      
+      if (statsResponse.success && healthResponse.success) {
+        return this.transformSystemInfoFromAPI(statsResponse.data, healthResponse.data);
       }
-    });
+      throw new Error('Failed to get system information');
+    } catch (error) {
+      console.error('Failed to get system info:', error);
+      // 返回默认系统信息作为后备
+      return this.getDefaultSystemInfo();
+    }
   }
 
   // 系统健康检查
@@ -115,32 +157,56 @@ export class SettingsService {
     checks: Record<string, boolean>;
     timestamp: string;
   }> {
-    await new Promise(resolve => setTimeout(resolve, 150));
-    return Promise.resolve({
-      status: 'healthy' as const,
-      checks: {
-        database: true,
-        storage: true,
-        cache: true,
-        queue: true,
-        diskSpace: true,
-        memory: true
-      },
-      timestamp: new Date().toISOString()
-    });
+    try {
+      const response = await systemClient.getSystemHealth();
+      if (response.success) {
+        return this.transformHealthCheckFromAPI(response.data);
+      }
+      throw new Error('Failed to get health check');
+    } catch (error) {
+      console.error('Failed to get health check:', error);
+      return {
+        status: 'unhealthy' as const,
+        checks: {
+          database: false,
+          storage: false,
+          cache: false,
+          queue: false,
+          diskSpace: false,
+          memory: false
+        },
+        timestamp: new Date().toISOString()
+      };
+    }
   }
 
   // 获取存储配置
   static async getStorageConfig(): Promise<StorageConfig> {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return Promise.resolve(this.mockSettings.storageConfig);
+    try {
+      const response = await systemClient.getStorageSettings();
+      if (response.success) {
+        return this.transformStorageConfigFromAPI(response.data);
+      }
+      throw new Error('Failed to get storage config');
+    } catch (error) {
+      console.error('Failed to get storage config:', error);
+      return this.getDefaultStorageConfig();
+    }
   }
 
   // 更新存储配置
   static async updateStorageConfig(config: StorageConfig): Promise<StorageConfig> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    this.mockSettings.storageConfig = config;
-    return Promise.resolve(config);
+    try {
+      const transformedConfig = this.transformStorageConfigToAPI(config);
+      const response = await systemClient.updateStorageSettings(transformedConfig);
+      if (response.success) {
+        return this.transformStorageConfigFromAPI(response.data);
+      }
+      throw new Error(response.message || 'Failed to update storage config');
+    } catch (error) {
+      console.error('Failed to update storage config:', error);
+      throw error;
+    }
   }
 
   // 测试存储连接
@@ -149,28 +215,62 @@ export class SettingsService {
     message: string;
     details?: any;
   }> {
-    await new Promise(resolve => setTimeout(resolve, 1000)); // 模拟测试延迟
-    return Promise.resolve({
-      success: true,
-      message: '存储连接测试成功',
-      details: {
-        type: config.type,
-        timestamp: new Date().toISOString()
-      }
-    });
+    try {
+      const transformedConfig = this.transformStorageConfigToAPI(config);
+      const response = await systemClient.testStorageSettings(transformedConfig);
+      return {
+        success: response.data.success,
+        message: response.data.message,
+        details: response.data.details
+      };
+    } catch (error) {
+      console.error('Failed to test storage connection:', error);
+      return {
+        success: false,
+        message: '存储连接测试失败',
+        details: {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        }
+      };
+    }
   }
 
-  // 获取邮件配置
+  // 获取邮件配置  
   static async getEmailConfig(): Promise<EmailConfig> {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return Promise.resolve(this.mockSettings.emailConfig);
+    try {
+      const response = await systemClient.getSettings();
+      if (response.success) {
+        return this.extractEmailConfigFromAPI(response.data.settings);
+      }
+      throw new Error('Failed to get email config');
+    } catch (error) {
+      console.error('Failed to get email config:', error);
+      return this.getDefaultEmailConfig();
+    }
   }
 
   // 更新邮件配置
   static async updateEmailConfig(config: EmailConfig): Promise<EmailConfig> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    this.mockSettings.emailConfig = config;
-    return Promise.resolve(config);
+    try {
+      // 获取当前设置然后更新邮件部分
+      const currentSettings = await systemClient.getSettings();
+      if (currentSettings.success) {
+        const updatedSettings = {
+          ...currentSettings.data.settings,
+          email_config: this.transformEmailConfigToAPI(config)
+        };
+        
+        const response = await systemClient.updateSettings(updatedSettings);
+        if (response.success) {
+          return config;
+        }
+      }
+      throw new Error('Failed to update email config');
+    } catch (error) {
+      console.error('Failed to update email config:', error);
+      throw error;
+    }
   }
 
   // 测试邮件发送
@@ -403,6 +503,305 @@ export class SettingsService {
     const blob = new Blob([logContent], { type: 'text/plain' });
     return Promise.resolve(blob);
   }
+
+  // ==================== 数据转换方法 ====================
+
+  // 将API响应转换为前端SystemSettings格式
+  private static transformSettingsFromAPI(apiData: any): SystemSettings {
+    return {
+      siteName: apiData.site_name || '云存储管理后台',
+      defaultUserQuota: apiData.default_user_quota || 5 * 1024 * 1024 * 1024,
+      allowRegistration: apiData.allow_registration || false,
+      maxFileSize: apiData.max_file_size || 100 * 1024 * 1024,
+      supportedFileTypes: apiData.supported_file_types || [
+        'image/jpeg', 'image/png', 'image/gif',
+        'application/pdf', 'text/plain'
+      ],
+      enableThumbnails: apiData.enable_thumbnails || true,
+      thumbnailSizes: apiData.thumbnail_sizes || ['small', 'medium'],
+      enableFileVersioning: apiData.enable_file_versioning || false,
+      maxFileVersions: apiData.max_file_versions || 3,
+      enableEmailNotifications: apiData.enable_email_notifications || false,
+      emailConfig: this.transformEmailConfigFromAPI(apiData.email_config),
+      storageConfig: this.transformStorageConfigFromAPI(apiData.storage_config),
+      theme: {
+        primaryColor: apiData.theme?.primary_color || '#1677FF',
+        darkMode: apiData.theme?.dark_mode || false
+      },
+      security: {
+        sessionTimeout: apiData.security?.session_timeout || 12 * 60,
+        enableTwoFactor: apiData.security?.enable_two_factor || false,
+        passwordMinLength: apiData.security?.password_min_length || 8,
+        passwordRequireSpecialChar: apiData.security?.password_require_special_char || true
+      }
+    };
+  }
+
+  // 将前端SystemSettings格式转换为API请求格式
+  private static transformSettingsToAPI(settings: UpdateSettingsRequest): any {
+    return {
+      site_name: settings.siteName,
+      default_user_quota: settings.defaultUserQuota,
+      allow_registration: settings.allowRegistration,
+      max_file_size: settings.maxFileSize,
+      supported_file_types: settings.supportedFileTypes,
+      enable_thumbnails: settings.enableThumbnails,
+      thumbnail_sizes: settings.thumbnailSizes,
+      enable_file_versioning: settings.enableFileVersioning,
+      max_file_versions: settings.maxFileVersions,
+      enable_email_notifications: settings.enableEmailNotifications,
+      email_config: this.transformEmailConfigToAPI(settings.emailConfig),
+      storage_config: this.transformStorageConfigToAPI(settings.storageConfig),
+      theme: {
+        primary_color: settings.theme?.primaryColor,
+        dark_mode: settings.theme?.darkMode
+      },
+      security: {
+        session_timeout: settings.security?.sessionTimeout,
+        enable_two_factor: settings.security?.enableTwoFactor,
+        password_min_length: settings.security?.passwordMinLength,
+        password_require_special_char: settings.security?.passwordRequireSpecialChar
+      }
+    };
+  }
+
+  // 将API响应转换为前端SystemInfo格式
+  private static transformSystemInfoFromAPI(statsData: any, healthData: any): SystemInfo {
+    return {
+      version: '1.0.0',
+      uptime: statsData.uptime || '0s',
+      totalUsers: statsData.total_users || 0,
+      totalFiles: statsData.total_files || 0,
+      totalStorage: statsData.total_storage || 0,
+      usedStorage: statsData.used_storage || 0,
+      availableStorage: statsData.available_storage || statsData.total_storage || 0,
+      systemHealth: {
+        status: healthData.status || 'unknown',
+        checks: healthData.checks || {},
+        timestamp: healthData.timestamp || new Date().toISOString()
+      },
+      services: {
+        'user-service': 'running',
+        'file-service': 'running',
+        'system-service': 'running',
+        'database': healthData.checks?.database ? 'running' : 'stopped',
+        'storage': healthData.checks?.storage ? 'running' : 'stopped',
+        'cache': healthData.checks?.cache ? 'running' : 'stopped'
+      }
+    };
+  }
+
+  // 将API健康检查响应转换为前端格式
+  private static transformHealthCheckFromAPI(healthData: any) {
+    return {
+      status: healthData.status === 'healthy' ? 'healthy' as const : 'unhealthy' as const,
+      checks: healthData.checks || {
+        database: false,
+        storage: false,
+        cache: false,
+        queue: false,
+        diskSpace: false,
+        memory: false
+      },
+      timestamp: healthData.timestamp || new Date().toISOString()
+    };
+  }
+
+  // 存储配置相关转换
+  private static transformStorageConfigFromAPI(apiData: any): StorageConfig {
+    if (!apiData) return this.getDefaultStorageConfig();
+    
+    return {
+      type: apiData.type || 'local',
+      localPath: apiData.local_path || './uploads',
+      maxStorageSize: apiData.max_storage_size || 500 * 1024 * 1024 * 1024,
+      s3Config: {
+        accessKeyId: apiData.s3_config?.access_key_id || '',
+        secretAccessKey: apiData.s3_config?.secret_access_key || '',
+        region: apiData.s3_config?.region || 'us-east-1',
+        bucket: apiData.s3_config?.bucket || '',
+        endpoint: apiData.s3_config?.endpoint || ''
+      }
+    };
+  }
+
+  private static transformStorageConfigToAPI(config: StorageConfig): any {
+    return {
+      type: config.type,
+      local_path: config.localPath,
+      max_storage_size: config.maxStorageSize,
+      s3_config: {
+        access_key_id: config.s3Config.accessKeyId,
+        secret_access_key: config.s3Config.secretAccessKey,
+        region: config.s3Config.region,
+        bucket: config.s3Config.bucket,
+        endpoint: config.s3Config.endpoint
+      }
+    };
+  }
+
+  // 邮件配置相关转换
+  private static transformEmailConfigFromAPI(apiData: any): EmailConfig {
+    if (!apiData) return this.getDefaultEmailConfig();
+    
+    return {
+      smtpHost: apiData.smtp_host || '',
+      smtpPort: apiData.smtp_port || 587,
+      smtpUser: apiData.smtp_user || '',
+      smtpPassword: apiData.smtp_password || '',
+      smtpSecure: apiData.smtp_secure || true,
+      fromName: apiData.from_name || '系统通知',
+      fromEmail: apiData.from_email || 'system@example.com'
+    };
+  }
+
+  private static transformEmailConfigToAPI(config: EmailConfig): any {
+    return {
+      smtp_host: config.smtpHost,
+      smtp_port: config.smtpPort,
+      smtp_user: config.smtpUser,
+      smtp_password: config.smtpPassword,
+      smtp_secure: config.smtpSecure,
+      from_name: config.fromName,
+      from_email: config.fromEmail
+    };
+  }
+
+  private static extractEmailConfigFromAPI(apiData: any): EmailConfig {
+    return this.transformEmailConfigFromAPI(apiData.email_config);
+  }
+
+  // ==================== 默认值方法 ====================
+
+  private static getDefaultSettings(): SystemSettings {
+    return {
+      siteName: '云存储管理后台',
+      defaultUserQuota: 5 * 1024 * 1024 * 1024, // 5GB
+      allowRegistration: false,
+      maxFileSize: 100 * 1024 * 1024, // 100MB
+      supportedFileTypes: [
+        'image/jpeg', 'image/png', 'image/gif',
+        'application/pdf', 'text/plain'
+      ],
+      enableThumbnails: true,
+      thumbnailSizes: ['small', 'medium'],
+      enableFileVersioning: false,
+      maxFileVersions: 3,
+      enableEmailNotifications: false,
+      emailConfig: this.getDefaultEmailConfig(),
+      storageConfig: this.getDefaultStorageConfig(),
+      theme: {
+        primaryColor: '#1677FF',
+        darkMode: false
+      },
+      security: {
+        sessionTimeout: 12 * 60,
+        enableTwoFactor: false,
+        passwordMinLength: 8,
+        passwordRequireSpecialChar: true
+      }
+    };
+  }
+
+  private static getDefaultSystemInfo(): SystemInfo {
+    return {
+      version: '1.0.0',
+      uptime: '0s',
+      totalUsers: 0,
+      totalFiles: 0,
+      totalStorage: 500 * 1024 * 1024 * 1024, // 500GB
+      usedStorage: 0,
+      availableStorage: 500 * 1024 * 1024 * 1024,
+      systemHealth: {
+        status: 'unknown',
+        checks: {},
+        timestamp: new Date().toISOString()
+      },
+      services: {
+        'user-service': 'unknown',
+        'file-service': 'unknown', 
+        'system-service': 'unknown',
+        'database': 'unknown',
+        'storage': 'unknown',
+        'cache': 'unknown'
+      }
+    };
+  }
+
+  private static getDefaultStorageConfig(): StorageConfig {
+    return {
+      type: 'local',
+      localPath: './uploads',
+      maxStorageSize: 500 * 1024 * 1024 * 1024, // 500GB
+      s3Config: {
+        accessKeyId: '',
+        secretAccessKey: '',
+        region: 'us-east-1',
+        bucket: '',
+        endpoint: ''
+      }
+    };
+  }
+
+  private static getDefaultEmailConfig(): EmailConfig {
+    return {
+      smtpHost: '',
+      smtpPort: 587,
+      smtpUser: '',
+      smtpPassword: '',
+      smtpSecure: true,
+      fromName: '系统通知',
+      fromEmail: 'system@example.com'
+    };
+  }
+
+  // Mock设置数据（作为后备）
+  private static mockSettings: SystemSettings = {
+    siteName: '云存储管理后台',
+    defaultUserQuota: 5 * 1024 * 1024 * 1024, // 5GB
+    allowRegistration: false,
+    maxFileSize: 100 * 1024 * 1024, // 100MB
+    supportedFileTypes: [
+      'image/jpeg', 'image/png', 'image/gif',
+      'application/pdf', 'text/plain'
+    ],
+    enableThumbnails: true,
+    thumbnailSizes: ['small', 'medium'],
+    enableFileVersioning: false,
+    maxFileVersions: 3,
+    enableEmailNotifications: false,
+    emailConfig: {
+      smtpHost: '',
+      smtpPort: 587,
+      smtpUser: '',
+      smtpPassword: '',
+      smtpSecure: true,
+      fromName: '系统通知',
+      fromEmail: 'system@example.com'
+    },
+    storageConfig: {
+      type: 'local',
+      localPath: './uploads',
+      maxStorageSize: 500 * 1024 * 1024 * 1024, // 500GB
+      s3Config: {
+        accessKeyId: '',
+        secretAccessKey: '',
+        region: 'us-east-1',
+        bucket: '',
+        endpoint: ''
+      }
+    },
+    theme: {
+      primaryColor: '#1677FF',
+      darkMode: false
+    },
+    security: {
+      sessionTimeout: 12 * 60, // 12小时
+      enableTwoFactor: false,
+      passwordMinLength: 8,
+      passwordRequireSpecialChar: true
+    }
+  };
 }
 
 // 导出服务实例

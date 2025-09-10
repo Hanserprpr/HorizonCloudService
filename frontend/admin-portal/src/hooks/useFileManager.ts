@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { message } from 'antd';
 import { fileService } from '@services/fileService';
+import { useFileStore } from '@stores/fileStore';
 import type { 
   FileItem, 
   FolderItem, 
@@ -53,9 +54,11 @@ export const useFolder = (folderId: number, enabled = true) => {
 
 // 获取文件夹内容（文件+子文件夹）
 export const useFolderContents = (folderId?: number, params?: SearchParams) => {
+  const { refreshKey } = useFileStore();
+  
   return useQuery({
-    queryKey: ['folder-contents', folderId, params],
-    queryFn: () => fileService.getFolderContents(folderId || 0, params),
+    queryKey: ['folder-contents', folderId, params, refreshKey],
+    queryFn: () => fileService.getFolderContents(folderId, params),
     staleTime: 30 * 1000,
     retry: 2,
   });

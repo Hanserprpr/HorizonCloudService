@@ -33,15 +33,27 @@ func SetupRoutes(r *gin.Engine, userService services.UserService, jwtSecret stri
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
 		auth.POST("/refresh", authHandler.RefreshToken)
+		
+		// 需要认证的认证路由
+		authProtected := auth.Use(authMiddleware.Authenticate())
+		authProtected.GET("/validate", authHandler.ValidateToken)
+		authProtected.POST("/logout", authHandler.Logout)
 	}
 	
-	// 需要认证的用户路由
+	// 需要认证的用户路由 (兼容前端路径)
+	users := v1.Group("/users")
+	users.Use(authMiddleware.Authenticate())
+	{
+		// 用户档案管理 (前端期望的路径)
+		users.GET("/profile", userHandler.GetProfile)
+		users.PUT("/profile", userHandler.UpdateProfile)
+		users.POST("/change-password", authHandler.ChangePassword)
+	}
+	
+	// 需要认证的用户路由 (原始路径 - 向后兼容)
 	user := v1.Group("/user")
 	user.Use(authMiddleware.Authenticate())
 	{
-		// 认证相关
-		user.POST("/logout", authHandler.Logout)
-		
 		// 用户档案管理
 		user.GET("/profile", userHandler.GetProfile)
 		user.PUT("/profile", userHandler.UpdateProfile)

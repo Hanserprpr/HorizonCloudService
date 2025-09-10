@@ -113,13 +113,14 @@ export class FileService {
   }
 
   // 获取文件夹内容
-  static async getFolderContents(folderId: number, params?: PaginationParams): Promise<{
+  static async getFolderContents(folderId?: number, params?: PaginationParams): Promise<{
     files: FileItem[];
     folders: FolderItem[];
     total_files: number;
     total_folders: number;
   }> {
-    const response = await fileApiClient.get(`/api/v1/folders/${folderId}/contents`, params);
+    const effectiveFolderId = folderId || 0;
+    const response = await fileApiClient.get(`/api/v1/folders/${effectiveFolderId}/contents`, params);
     return response.data;
   }
 

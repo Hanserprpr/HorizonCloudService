@@ -57,7 +57,7 @@ const FilesPage: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
   // 当前文件夹ID（从URL参数或store获取）
-  const effectiveFolderId = folderId ? parseInt(folderId) : (currentFolderId || 0);
+  const effectiveFolderId = folderId ? parseInt(folderId) : currentFolderId;
 
   // 数据获取
   const { 
