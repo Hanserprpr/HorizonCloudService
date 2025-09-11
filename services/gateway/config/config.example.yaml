@@ -14,11 +14,11 @@ jwt:
   secret: "your-super-secret-jwt-key-here-32-chars"
   expires_in: 86400  # 24小时 (秒)
 
-# 微服务配置
+# 微服务配置  
 services:
   user-service:
     host: "localhost"
-    port: 8081
+    port: 8001  # 修正端口
     prefix: "/api/v1/users"
   
   permission-service:
@@ -28,7 +28,7 @@ services:
   
   file-service:
     host: "localhost"
-    port: 8083
+    port: 8083  # 需要确认实际端口
     prefix: "/api/v1/files"
   
   ai-service:

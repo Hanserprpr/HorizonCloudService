@@ -20,12 +20,15 @@ func NewAuthMiddleware(jwtSecret string) *AuthMiddleware {
 	}
 }
 
-// JWTClaims JWT声明结构
+// JWTClaims JWT声明结构 - 与服务层保持一致
 type JWTClaims struct {
 	UserID    uint   `json:"user_id"`
+	Username  string `json:"username"`  // 兼容文件服务
+	Email     string `json:"email"`     // 兼容文件服务
+	Role      string `json:"role"`      // 兼容文件服务（字符串类型）
 	StudentID string `json:"student_id"`
 	RoleID    int    `json:"role_id"`
-	Type      string `json:"type"`
+	Type      string `json:"type"` // "access" 或 "refresh"
 	jwt.RegisteredClaims
 }
 
@@ -108,6 +111,9 @@ func (m *AuthMiddleware) Authenticate() gin.HandlerFunc {
 		
 		// 将用户信息保存到上下文
 		c.Set("user_id", claims.UserID)
+		c.Set("username", claims.Username)
+		c.Set("email", claims.Email)
+		c.Set("role", claims.Role)
 		c.Set("student_id", claims.StudentID)
 		c.Set("role_id", claims.RoleID)
 		

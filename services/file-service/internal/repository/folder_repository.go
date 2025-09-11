@@ -387,9 +387,10 @@ func (r *folderRepository) Search(ctx context.Context, userID uint, keyword stri
 	query := r.db.WithContext(ctx).Model(&models.Folder{}).Where("user_id = ?", userID)
 	
 	if keyword != "" {
+		// 使用LIKE搜索结合LOWER函数实现不区分大小写搜索（SQLite兼容）
 		query = query.Where(
-			"to_tsvector('simple', name) @@ plainto_tsquery('simple', ?) OR "+
-				"name ILIKE ?", keyword, "%"+keyword+"%")
+			"LOWER(name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?)", 
+			"%"+keyword+"%", "%"+keyword+"%")
 	}
 	
 	var total int64

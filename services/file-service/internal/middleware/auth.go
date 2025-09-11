@@ -2,8 +2,10 @@ package middleware
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -20,12 +22,14 @@ type AuthConfig struct {
 	SkipPaths     []string // 跳过认证的路径
 }
 
-// UserClaims JWT用户声明
+// UserClaims JWT用户声明 - 兼容用户服务格式
 type UserClaims struct {
-	UserID   uint   `json:"user_id"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Role     string `json:"role"`
+	UserID    uint   `json:"user_id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	Role      string `json:"role"`
+	StudentID string `json:"student_id"`
+	RoleID    int    `json:"role_id"`
 	jwt.RegisteredClaims
 }
 
@@ -277,19 +281,49 @@ func (m *AuthMiddleware) RefreshToken(tokenString string) (string, error) {
 
 // validateJWT 验证JWT token
 func (m *AuthMiddleware) validateJWT(tokenString string) (*UserClaims, error) {
+	log.Printf("[DEBUG] 开始验证JWT令牌")
+	log.Printf("[DEBUG] 令牌字符串长度: %d", len(tokenString))
+	log.Printf("[DEBUG] 令牌字符串前50个字符: %.50s...", tokenString)
+	log.Printf("[DEBUG] JWT密钥长度: %d", len(m.config.JWTSecret))
+	log.Printf("[DEBUG] JWT密钥内容: %s", string(m.config.JWTSecret))
+	
+	// 尝试手动解码令牌头部查看算法
+	tokenParts := strings.Split(tokenString, ".")
+	if len(tokenParts) >= 2 {
+		headerBytes, err := base64.RawURLEncoding.DecodeString(tokenParts[0])
+		if err == nil {
+			log.Printf("[DEBUG] 令牌头部: %s", string(headerBytes))
+		} else {
+			log.Printf("[DEBUG] 解码令牌头部失败: %v", err)
+		}
+	}
+	
 	token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
+		log.Printf("[DEBUG] 令牌签名方法: %v", token.Method.Alg())
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			log.Printf("[DEBUG] 签名方法不匹配，期望: HMAC, 实际: %T", token.Method)
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
+		log.Printf("[DEBUG] 返回密钥进行验证，长度: %d", len(m.config.JWTSecret))
 		return m.config.JWTSecret, nil
 	})
 
 	if err != nil {
+		log.Printf("[DEBUG] JWT解析错误: %v", err)
 		return nil, err
 	}
 
-	if claims, ok := token.Claims.(*UserClaims); ok && token.Valid {
-		return claims, nil
+	log.Printf("[DEBUG] 令牌解析完成，有效性: %v", token.Valid)
+	if claims, ok := token.Claims.(*UserClaims); ok {
+		log.Printf("[DEBUG] 声明类型正确，用户ID: %d, 用户名: %s", claims.UserID, claims.Username)
+		if token.Valid {
+			log.Printf("[DEBUG] 令牌有效，返回声明")
+			return claims, nil
+		} else {
+			log.Printf("[DEBUG] 令牌无效")
+		}
+	} else {
+		log.Printf("[DEBUG] 声明类型不匹配")
 	}
 
 	return nil, errors.New("invalid token claims")

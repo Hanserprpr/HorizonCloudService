@@ -33,6 +33,13 @@ func main() {
 		cfg = getDefaultConfig()
 	}
 
+	// 打印配置信息用于调试
+	log.Printf("Loaded configuration:")
+	log.Printf("  App.Name: %s", cfg.App.Name)
+	log.Printf("  Server.Port: %d", cfg.Server.Port)
+	log.Printf("  UserService.BaseURL: %s", cfg.UserService.BaseURL)
+	log.Printf("  UserService.TimeoutSeconds: %d", cfg.UserService.TimeoutSeconds)
+
 	// 设置运行模式
 	if cfg.App.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -65,6 +72,12 @@ func main() {
 	serviceContainer := initServices(repo, storageClient)
 
 	// 初始化中间件配置
+	log.Printf("=== JWT配置调试信息 ===")
+	log.Printf("JWT_SECRET环境变量: '%s'", os.Getenv("JWT_SECRET"))
+	log.Printf("配置文件JWT密钥: '%s' (长度: %d)", cfg.JWT.Secret, len(cfg.JWT.Secret))
+	log.Printf("JWT密钥字节表示: %v", []byte(cfg.JWT.Secret))
+	log.Printf("========================")
+	
 	authConfig := &middleware.AuthConfig{
 		JWTSecret:     []byte(cfg.JWT.Secret),
 		JWTExpiration: time.Duration(cfg.JWT.ExpirationHours) * time.Hour,
@@ -149,7 +162,7 @@ func getDefaultConfig() *config.Config {
 			Debug:       true,
 		},
 		Server: config.ServerConfig{
-			Port:                8083,
+			Port:                8002,
 			ReadTimeoutSeconds:  30,
 			WriteTimeoutSeconds: 30,
 			IdleTimeoutSeconds:  120,
@@ -169,7 +182,7 @@ func getDefaultConfig() *config.Config {
 			ConnMaxLifetimeMinutes:   60,
 		},
 		JWT: config.JWTConfig{
-			Secret:          "your-secret-key",
+			Secret:          "your-development-secret-key",  // 与用户服务保持一致
 			ExpirationHours: 24,
 		},
 		Storage: config.StorageConfig{
@@ -187,7 +200,7 @@ func getDefaultConfig() *config.Config {
 			WarningThreshold:       0.8,
 		},
 		UserService: config.UserServiceConfig{
-			BaseURL:                "",
+			BaseURL:                "http://localhost:8001",  // 设置用户服务地址
 			APIKey:                 "",
 			TimeoutSeconds:         30,
 			RetryCount:             3,
@@ -321,13 +334,9 @@ func initStorage(cfg *config.Config) (storage.Storage, error) {
 
 // initUserServiceClient 初始化用户服务客户端
 func initUserServiceClient(cfg *config.Config) services.UserServiceClient {
-	if cfg.App.Environment == "development" || cfg.UserService.BaseURL == "" {
-		// 开发环境使用Mock客户端
-		log.Println("Using mock user service client")
-		return services.NewMockUserServiceClient()
-	}
-
-	// 生产环境使用真实客户端
+	// 一律使用真实用户服务客户端
+	log.Printf("UserService BaseURL from config: '%s'", cfg.UserService.BaseURL)
+	log.Printf("Always using real user service client with base URL: %s", cfg.UserService.BaseURL)
 	userServiceConfig := &services.UserServiceConfig{
 		BaseURL:              cfg.UserService.BaseURL,
 		APIKey:               cfg.UserService.APIKey,

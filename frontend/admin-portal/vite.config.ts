@@ -24,8 +24,38 @@ export default defineConfig({
     open: true,
     cors: true,
     proxy: {
-      '/api': {
-        target: 'http://localhost:8083',
+      '/api/v1/auth': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/v1/users': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/v1/admin': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/v1/files': {
+        target: 'http://localhost:8002',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/v1/folders': {
+        target: 'http://localhost:8002',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/v1/upload': {
+        target: 'http://localhost:8002',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/v1/system': {
+        target: 'http://localhost:8003',
         changeOrigin: true,
         secure: false,
       }

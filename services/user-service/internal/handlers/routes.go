@@ -16,6 +16,7 @@ func SetupRoutes(r *gin.Engine, userService services.UserService, jwtSecret stri
 	adminHandler := NewAdminHandler(userService)
 	quotaHandler := NewQuotaHandler(userService)
 	activityHandler := NewActivityHandler(userService)
+	internalHandler := NewInternalHandler(userService)
 	
 	// 创建中间件
 	authMiddleware := middleware.NewAuthMiddleware(jwtSecret)
@@ -94,6 +95,9 @@ func SetupRoutes(r *gin.Engine, userService services.UserService, jwtSecret stri
 	// 内部服务路由（供其他微服务调用）
 	internal := v1.Group("/internal")
 	{
+		// 用户信息获取（文件服务调用）
+		internal.GET("/users/:user_id", internalHandler.GetUser)
+		
 		// 配额管理（文件服务调用）
 		internal.PUT("/quota/:user_id/used", quotaHandler.UpdateStorageUsed)
 		

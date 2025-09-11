@@ -100,7 +100,7 @@ func (s *userService) Register(ctx context.Context, req *RegisterRequest) (*Auth
 	s.logUserActivity(ctx, user.ID, "register", "user", "用户注册", req.IPAddress, req.UserAgent)
 	
 	// 生成JWT令牌
-	tokens, err := s.generateTokens(user.ID, user.StudentID, user.RoleID)
+	tokens, err := s.generateTokens(user.ID, user.StudentID, user.Email, user.StudentID, user.RoleID)
 	if err != nil {
 		return nil, fmt.Errorf("生成令牌失败: %w", err)
 	}
@@ -161,7 +161,7 @@ func (s *userService) Login(ctx context.Context, req *LoginRequest) (*AuthRespon
 	s.logUserActivity(ctx, user.ID, "login", "user", "用户登录", req.IPAddress, req.UserAgent)
 	
 	// 生成JWT令牌
-	tokens, err := s.generateTokens(user.ID, user.StudentID, user.RoleID)
+	tokens, err := s.generateTokens(user.ID, user.StudentID, user.Email, user.StudentID, user.RoleID)
 	if err != nil {
 		return nil, fmt.Errorf("生成令牌失败: %w", err)
 	}
@@ -219,7 +219,7 @@ func (s *userService) RefreshToken(ctx context.Context, refreshToken string) (*A
 	}
 	
 	// 生成新的访问令牌
-	tokens, err := s.generateTokens(user.ID, user.StudentID, user.RoleID)
+	tokens, err := s.generateTokens(user.ID, user.StudentID, user.Email, user.StudentID, user.RoleID)
 	if err != nil {
 		return nil, fmt.Errorf("生成令牌失败: %w", err)
 	}

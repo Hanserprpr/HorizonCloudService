@@ -26,6 +26,7 @@ export SERVER_PORT=8002
 export STORAGE_BACKEND=local
 export LOCAL_STORAGE_ROOT=./uploads
 export JWT_SECRET=your-development-secret-key
+export USER_SERVICE_BASE_URL=http://localhost:8001
 
 echo "⚙️  Environment Configuration:"
 echo "   - Port: 8002"
@@ -43,4 +44,4 @@ echo "Press Ctrl+C to stop the server"
 echo "============================================"
 
 # 启动服务器
-go run cmd/main_simple.go
+go run cmd/main.go

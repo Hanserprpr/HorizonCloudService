@@ -120,7 +120,7 @@ func Load() (*Config, error) {
 			Debug:       getEnvBool("APP_DEBUG", true),
 		},
 		Server: ServerConfig{
-			Port:               getEnvInt("SERVER_PORT", 8083),
+			Port:               getEnvInt("SERVER_PORT", 8002),
 			ReadTimeoutSeconds: getEnvInt("SERVER_READ_TIMEOUT", 30),
 			WriteTimeoutSeconds: getEnvInt("SERVER_WRITE_TIMEOUT", 30),
 			IdleTimeoutSeconds: getEnvInt("SERVER_IDLE_TIMEOUT", 120),
@@ -162,7 +162,7 @@ func Load() (*Config, error) {
 			},
 		},
 		JWT: JWTConfig{
-			Secret:          getEnv("JWT_SECRET", "your-secret-key"),
+			Secret:          getEnv("JWT_SECRET", "your-development-secret-key"),
 			ExpirationHours: getEnvInt("JWT_EXPIRATION_HOURS", 24),
 		},
 		UserService: UserServiceConfig{

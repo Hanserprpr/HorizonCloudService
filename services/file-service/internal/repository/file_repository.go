@@ -183,13 +183,12 @@ func (r *fileRepository) List(ctx context.Context, userID uint, folderID *uint, 
 func (r *fileRepository) Search(ctx context.Context, userID uint, keyword string, offset, limit int, filters *FileFilters) ([]*models.File, int64, error) {
 	query := r.db.WithContext(ctx).Model(&models.File{}).Where("user_id = ?", userID)
 	
-	// 全文搜索
+	// 全文搜索 - 兼容SQLite和PostgreSQL
 	if keyword != "" {
+		// 使用LIKE搜索结合LOWER函数实现不区分大小写搜索（SQLite兼容）
 		query = query.Where(
-			"to_tsvector('simple', name) @@ plainto_tsquery('simple', ?) OR "+
-				"to_tsvector('simple', original_name) @@ plainto_tsquery('simple', ?) OR "+
-				"name ILIKE ? OR original_name ILIKE ?",
-			keyword, keyword, "%"+keyword+"%", "%"+keyword+"%")
+			"LOWER(name) LIKE LOWER(?) OR LOWER(original_name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?)",
+			"%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
 	}
 	
 	// 应用过滤器

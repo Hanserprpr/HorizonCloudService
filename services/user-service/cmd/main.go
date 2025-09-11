@@ -13,6 +13,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"user-service/internal/handlers"
+	"user-service/internal/middleware"
 	"user-service/internal/repository"
 	"user-service/internal/services"
 )
@@ -24,8 +25,15 @@ func main() {
 	// 初始化Mock仓库层（用于测试）
 	userRepo := repository.NewMockUserRepository()
 	
-	// 初始化服务层
-	userService := services.NewUserService(userRepo, "your-jwt-secret-key")
+	// 初始化服务层 - 使用统一的JWT密钥
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "your-development-secret-key" // 与file-service保持一致
+	}
+	userService := services.NewUserService(userRepo, jwtSecret)
+	
+	// 初始化认证中间件
+	authMiddleware := middleware.NewAuthMiddleware(jwtSecret)
 	
 	// 初始化处理器
 	authHandler := handlers.NewAuthHandler(userService)
@@ -33,6 +41,7 @@ func main() {
 	adminHandler := handlers.NewAdminHandler(userService)
 	quotaHandler := handlers.NewQuotaHandler(userService)
 	activityHandler := handlers.NewActivityHandler(userService)
+	internalHandler := handlers.NewInternalHandler(userService)
 
 	// 创建路由
 	router := gin.New()
@@ -70,11 +79,13 @@ func main() {
 		auth.POST("/login", authHandler.Login)
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/refresh", authHandler.RefreshToken)
-		auth.POST("/logout", authHandler.Logout)
+		// 登出需要认证中间件验证令牌
+		auth.POST("/logout", authMiddleware.Authenticate(), authHandler.Logout)
 	}
 
-	// 用户路由 (需要认证，暂时不使用JWT中间件，便于测试)
+	// 用户路由 (需要认证)
 	users := api.Group("/users")
+	users.Use(authMiddleware.Authenticate())
 	{
 		users.GET("/profile", userHandler.GetProfile)
 		users.PUT("/profile", userHandler.UpdateProfile)
@@ -111,6 +122,12 @@ func main() {
 		activity.GET("/system", activityHandler.GetSystemActivityLogs)
 		activity.GET("/statistics", activityHandler.GetActivityStatistics)
 		activity.POST("/batch-delete", activityHandler.BatchDeleteLogs)
+	}
+	
+	// 内部服务路由 (用于微服务间通信，无需认证)
+	internal := api.Group("/internal")
+	{
+		internal.GET("/users/:user_id", internalHandler.GetUser)
 	}
 
 	// 启动服务器

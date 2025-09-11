@@ -1,0 +1,39 @@
+{
+  "name": "horizon-cloud-service-api-tests",
+  "version": "1.0.0",
+  "description": "Complete API test suite for Horizon Cloud Service - Frontend simulation using JavaScript/Node.js",
+  "type": "module",
+  "main": "comprehensive-api-test.js",
+  "scripts": {
+    "test": "node comprehensive-api-test.js",
+    "test:basic": "node api-test.js",
+    "test:go": "go run tools/integration_test_suite.go",
+    "start:services": "./tools/start_services.sh",
+    "stop:services": "pkill -f 'go run.*main.go' || true",
+    "test:full": "npm run start:services && sleep 5 && npm test",
+    "test:watch": "nodemon comprehensive-api-test.js",
+    "test:debug": "node --inspect-brk comprehensive-api-test.js"
+  },
+  "keywords": [
+    "api-testing",
+    "integration-tests",
+    "microservices",
+    "file-storage",
+    "cloud-service",
+    "javascript",
+    "nodejs",
+    "axios",
+    "frontend-simulation"
+  ],
+  "author": "HorizonCloudService Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.11.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

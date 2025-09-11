@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -106,7 +107,7 @@ func (c *userServiceClient) GetUser(ctx context.Context, userID uint) (*UserInfo
 		SetContext(ctx).
 		SetPathParam("user_id", fmt.Sprintf("%d", userID)).
 		SetResult(&response).
-		Get("/api/v1/users/{user_id}")
+		Get("/api/v1/internal/users/{user_id}")
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -125,31 +126,8 @@ func (c *userServiceClient) GetUser(ctx context.Context, userID uint) (*UserInfo
 
 // GetUserByEmail 根据邮箱获取用户信息
 func (c *userServiceClient) GetUserByEmail(ctx context.Context, email string) (*UserInfo, error) {
-	var response struct {
-		Code    int      `json:"code"`
-		Message string   `json:"message"`
-		Data    UserInfo `json:"data"`
-	}
-
-	resp, err := c.client.R().
-		SetContext(ctx).
-		SetQueryParam("email", email).
-		SetResult(&response).
-		Get("/api/v1/users/search")
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user by email: %w", err)
-	}
-
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("user service returned status %d: %s", resp.StatusCode(), resp.String())
-	}
-
-	if response.Code != 200 {
-		return nil, fmt.Errorf("user service error: %s", response.Message)
-	}
-
-	return &response.Data, nil
+	// 用户服务目前不支持根据邮箱查找用户
+	return nil, fmt.Errorf("user service does not support searching users by email")
 }
 
 // UpdateUserQuota 更新用户配额
@@ -166,10 +144,10 @@ func (c *userServiceClient) UpdateUserQuota(ctx context.Context, userID uint, st
 
 	resp, err := c.client.R().
 		SetContext(ctx).
-		SetPathParam("user_id", fmt.Sprintf("%d", userID)).
+		SetPathParam("id", fmt.Sprintf("%d", userID)).
 		SetBody(requestBody).
 		SetResult(&response).
-		Put("/api/v1/users/{user_id}/quota")
+		Put("/api/v1/admin/users/{id}/quota")
 
 	if err != nil {
 		return fmt.Errorf("failed to update user quota: %w", err)
@@ -203,10 +181,10 @@ func (c *userServiceClient) ValidateUserPermission(ctx context.Context, userID u
 
 	resp, err := c.client.R().
 		SetContext(ctx).
-		SetPathParam("user_id", fmt.Sprintf("%d", userID)).
+		SetPathParam("id", fmt.Sprintf("%d", userID)).
 		SetBody(requestBody).
 		SetResult(&response).
-		Post("/api/v1/users/{user_id}/permissions/check")
+		Post("/api/v1/admin/users/{id}/permissions/check")
 
 	if err != nil {
 		return false, fmt.Errorf("failed to validate user permission: %w", err)
@@ -233,9 +211,9 @@ func (c *userServiceClient) GetUserRole(ctx context.Context, userID uint) (*User
 
 	resp, err := c.client.R().
 		SetContext(ctx).
-		SetPathParam("user_id", fmt.Sprintf("%d", userID)).
+		SetPathParam("id", fmt.Sprintf("%d", userID)).
 		SetResult(&response).
-		Get("/api/v1/users/{user_id}/role")
+		Get("/api/v1/admin/users/{id}/role")
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user role: %w", err)
@@ -265,10 +243,10 @@ func (c *userServiceClient) UpdateUserStorageUsage(ctx context.Context, userID u
 
 	resp, err := c.client.R().
 		SetContext(ctx).
-		SetPathParam("user_id", fmt.Sprintf("%d", userID)).
+		SetPathParam("id", fmt.Sprintf("%d", userID)).
 		SetBody(requestBody).
 		SetResult(&response).
-		Put("/api/v1/users/{user_id}/storage-usage")
+		Put("/api/v1/admin/users/{id}/storage-usage")
 
 	if err != nil {
 		return fmt.Errorf("failed to update storage usage: %w", err)
@@ -299,10 +277,10 @@ func (c *userServiceClient) NotifyQuotaExceeded(ctx context.Context, userID uint
 
 	resp, err := c.client.R().
 		SetContext(ctx).
-		SetPathParam("user_id", fmt.Sprintf("%d", userID)).
+		SetPathParam("id", fmt.Sprintf("%d", userID)).
 		SetBody(requestBody).
 		SetResult(&response).
-		Post("/api/v1/users/{user_id}/quota-exceeded")
+		Post("/api/v1/admin/users/{id}/quota-exceeded")
 
 	if err != nil {
 		return fmt.Errorf("failed to notify quota exceeded: %w", err)
@@ -322,61 +300,55 @@ func (c *userServiceClient) NotifyQuotaExceeded(ctx context.Context, userID uint
 // MockUserServiceClient Mock用户服务客户端（用于测试和开发）
 type MockUserServiceClient struct {
 	users map[uint]*UserInfo
+	mutex sync.RWMutex
 }
 
 // NewMockUserServiceClient 创建Mock用户服务客户端
 func NewMockUserServiceClient() UserServiceClient {
 	return &MockUserServiceClient{
-		users: map[uint]*UserInfo{
-			1: {
-				ID:             1,
-				Username:       "admin",
-				Email:          "admin@example.com",
-				Role:           "admin",
-				Status:         1,
-				StorageQuota:   10 * 1024 * 1024 * 1024, // 10GB
-				FileCountQuota: 50000,
-				StorageUsed:    0,
-				FileCount:      0,
-				CreatedAt:      time.Now(),
-				UpdatedAt:      time.Now(),
-				Settings:       make(map[string]interface{}),
-			},
-			2: {
-				ID:             2,
-				Username:       "testuser",
-				Email:          "test@example.com",
-				Role:           "user",
-				Status:         1,
-				StorageQuota:   5 * 1024 * 1024 * 1024, // 5GB
-				FileCountQuota: 10000,
-				StorageUsed:    0,
-				FileCount:      0,
-				CreatedAt:      time.Now(),
-				UpdatedAt:      time.Now(),
-				Settings:       make(map[string]interface{}),
-			},
-		},
+		users: make(map[uint]*UserInfo),
 	}
 }
 
 func (m *MockUserServiceClient) GetUser(ctx context.Context, userID uint) (*UserInfo, error) {
-	if user, exists := m.users[userID]; exists {
-		return user, nil
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	
+	// 动态创建用户（用于测试）
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	
+	// 创建新用户
+	user := &UserInfo{
+		ID:             userID,
+		Username:       fmt.Sprintf("testuser_%d", userID),
+		Email:          fmt.Sprintf("testuser_%d@example.com", userID),
+		Role:           "user",
+		Status:         1,
+		StorageQuota:   5 * 1024 * 1024 * 1024, // 5GB
+		FileCountQuota: 10000,
+		StorageUsed:    0,
+		FileCount:      0,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+		Settings:       make(map[string]interface{}),
 	}
-	return nil, fmt.Errorf("user not found: %d", userID)
+	
+	m.users[userID] = user
+	return user, nil
 }
 
 func (m *MockUserServiceClient) GetUserByEmail(ctx context.Context, email string) (*UserInfo, error) {
-	for _, user := range m.users {
-		if user.Email == email {
-			return user, nil
-		}
-	}
-	return nil, fmt.Errorf("user not found with email: %s", email)
+	// Mock实现：只记录日志，不做实际查找
+	fmt.Printf("Mock: GetUserByEmail called with email: %s\n", email)
+	return nil, fmt.Errorf("user service does not support searching users by email")
 }
 
 func (m *MockUserServiceClient) UpdateUserQuota(ctx context.Context, userID uint, storageQuota, fileCountQuota int64) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	
+	// 更新用户配额
 	if user, exists := m.users[userID]; exists {
 		user.StorageQuota = storageQuota
 		user.FileCountQuota = fileCountQuota
@@ -387,14 +359,20 @@ func (m *MockUserServiceClient) UpdateUserQuota(ctx context.Context, userID uint
 }
 
 func (m *MockUserServiceClient) ValidateUserPermission(ctx context.Context, userID uint, resource, action string) (bool, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	
+	// 简单权限检查：admin拥有所有权限
 	if user, exists := m.users[userID]; exists {
-		// 简单权限检查：admin拥有所有权限
 		return user.Role == "admin", nil
 	}
 	return false, fmt.Errorf("user not found: %d", userID)
 }
 
 func (m *MockUserServiceClient) GetUserRole(ctx context.Context, userID uint) (*UserRole, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	
 	if user, exists := m.users[userID]; exists {
 		permissions := []string{"read"}
 		if user.Role == "admin" {
@@ -409,6 +387,9 @@ func (m *MockUserServiceClient) GetUserRole(ctx context.Context, userID uint) (*
 }
 
 func (m *MockUserServiceClient) UpdateUserStorageUsage(ctx context.Context, userID uint, usedStorage int64) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	
 	if user, exists := m.users[userID]; exists {
 		user.StorageUsed = usedStorage
 		user.UpdatedAt = time.Now()

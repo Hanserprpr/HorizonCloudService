@@ -9,9 +9,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// JWTClaims JWT声明结构
+// JWTClaims JWT声明结构 - 兼容文件服务格式
 type JWTClaims struct {
 	UserID    uint   `json:"user_id"`
+	Username  string `json:"username"`  // 兼容文件服务
+	Email     string `json:"email"`     // 兼容文件服务
+	Role      string `json:"role"`      // 兼容文件服务（字符串类型）
 	StudentID string `json:"student_id"`
 	RoleID    int    `json:"role_id"`
 	Type      string `json:"type"` // "access" 或 "refresh"
@@ -26,12 +29,21 @@ type TokenPair struct {
 }
 
 // generateTokens 生成访问令牌和刷新令牌
-func (s *userService) generateTokens(userID uint, studentID string, roleID int) (*TokenPair, error) {
+func (s *userService) generateTokens(userID uint, username, email, studentID string, roleID int) (*TokenPair, error) {
 	now := time.Now()
+	
+	// 将角色ID转换为角色字符串
+	roleStr := "user" // 默认角色
+	if roleID == 1 {
+		roleStr = "admin"
+	}
 	
 	// 访问令牌声明 (有效期2小时)
 	accessClaims := &JWTClaims{
 		UserID:    userID,
+		Username:  username,
+		Email:     email,
+		Role:      roleStr,
 		StudentID: studentID,
 		RoleID:    roleID,
 		Type:      "access",
@@ -47,6 +59,9 @@ func (s *userService) generateTokens(userID uint, studentID string, roleID int) 
 	// 刷新令牌声明 (有效期7天)
 	refreshClaims := &JWTClaims{
 		UserID:    userID,
+		Username:  username,
+		Email:     email,
+		Role:      roleStr,
 		StudentID: studentID,
 		RoleID:    roleID,
 		Type:      "refresh",

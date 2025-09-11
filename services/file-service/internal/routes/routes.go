@@ -83,9 +83,21 @@ func (r *Router) setupMiddleware() {
 
 	// CORS中间件
 	r.engine.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		origin := c.GetHeader("Origin")
+		if origin == "" {
+			origin = "*"
+		}
+		
+		c.Header("Access-Control-Allow-Origin", origin)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Requested-With")
+		c.Header("Access-Control-Allow-Credentials", "true")
+		c.Header("Access-Control-Max-Age", "86400") // 24小时缓存预检结果
+		
+		// 只在有实际X-Request-ID时才暴露
+		if requestID := c.GetHeader("X-Request-ID"); requestID != "" {
+			c.Header("Access-Control-Expose-Headers", "X-Request-ID")
+		}
 		
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -115,13 +127,26 @@ func (r *Router) setupMiddleware() {
 
 	// 请求ID中间件
 	r.engine.Use(func(c *gin.Context) {
+		// 只有在非OPTIONS请求时才处理请求ID
+		if c.Request.Method == "OPTIONS" {
+			c.Next()
+			return
+		}
+		
 		requestID := c.GetHeader("X-Request-ID")
 		if requestID == "" {
 			requestID = generateRequestID()
 		}
+		
 		c.Set("request_id", requestID)
-		c.Header("X-Request-ID", requestID)
+		
+		// 只在成功处理请求后才设置响应头
 		c.Next()
+		
+		// 检查请求是否成功完成
+		if c.Writer.Status() < 400 {
+			c.Header("X-Request-ID", requestID)
+		}
 	})
 }
 

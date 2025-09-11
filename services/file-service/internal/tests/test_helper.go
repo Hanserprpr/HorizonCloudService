@@ -417,7 +417,7 @@ func CreateTestConfig() *config.Config {
 			Debug:       true,
 		},
 		Server: config.ServerConfig{
-			Port:               8083,
+			Port:               8002,
 			ReadTimeoutSeconds: 30,
 			WriteTimeoutSeconds: 30,
 			IdleTimeoutSeconds: 120,
