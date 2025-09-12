@@ -100,6 +100,23 @@ func (h *FolderHandler) GetFolder(c *gin.Context) {
 	h.Success(c, folder)
 }
 
+func (h *FolderHandler) GetFolderRecommend(c *gin.Context) {
+	userID := h.RequireAuth(c)
+	if userID == 0 {
+		return
+	}
+
+	folderID := uint(0)
+
+	folder, err := h.services.Folder.GetFolder(c.Request.Context(), folderID, userID)
+	if err != nil {
+		h.HandleServiceError(c, err)
+		return
+	}
+
+	h.Success(c, folder)
+}
+
 // GetFolderByPath 根据路径获取文件夹
 func (h *FolderHandler) GetFolderByPath(c *gin.Context) {
 	userID := h.RequireAuth(c)

@@ -29,34 +29,34 @@ type AppConfig struct {
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
-	Port               int `json:"port"`
-	ReadTimeoutSeconds int `json:"read_timeout_seconds"`
+	Port                int `json:"port"`
+	ReadTimeoutSeconds  int `json:"read_timeout_seconds"`
 	WriteTimeoutSeconds int `json:"write_timeout_seconds"`
-	IdleTimeoutSeconds int `json:"idle_timeout_seconds"`
-	MaxHeaderBytes     int `json:"max_header_bytes"`
+	IdleTimeoutSeconds  int `json:"idle_timeout_seconds"`
+	MaxHeaderBytes      int `json:"max_header_bytes"`
 }
 
 // DatabaseConfig 数据库配置
 type DatabaseConfig struct {
-	Host                     string `json:"host"`
-	Port                     int    `json:"port"`
-	User                     string `json:"user"`
-	Password                 string `json:"password"`
-	Name                     string `json:"name"`
-	SSLMode                  string `json:"ssl_mode"`
-	Timezone                 string `json:"timezone"`
-	MaxIdleConns             int    `json:"max_idle_conns"`
-	MaxOpenConns             int    `json:"max_open_conns"`
-	ConnMaxLifetimeMinutes   int    `json:"conn_max_lifetime_minutes"`
-	LogLevel                 string `json:"log_level"`
+	Host                   string `json:"host"`
+	Port                   int    `json:"port"`
+	User                   string `json:"user"`
+	Password               string `json:"password"`
+	Name                   string `json:"name"`
+	SSLMode                string `json:"ssl_mode"`
+	Timezone               string `json:"timezone"`
+	MaxIdleConns           int    `json:"max_idle_conns"`
+	MaxOpenConns           int    `json:"max_open_conns"`
+	ConnMaxLifetimeMinutes int    `json:"conn_max_lifetime_minutes"`
+	LogLevel               string `json:"log_level"`
 }
 
 // StorageConfig 存储配置
 type StorageConfig struct {
-	Backend string          `json:"backend"`
-	MinIO   MinIOConfig     `json:"minio"`
-	S3      S3Config        `json:"s3"`
-	Local   LocalConfig     `json:"local"`
+	Backend string      `json:"backend"`
+	MinIO   MinIOConfig `json:"minio"`
+	S3      S3Config    `json:"s3"`
+	Local   LocalConfig `json:"local"`
 }
 
 // MinIOConfig MinIO配置
@@ -92,22 +92,22 @@ type JWTConfig struct {
 
 // UserServiceConfig 用户服务配置
 type UserServiceConfig struct {
-	BaseURL               string `json:"base_url"`
-	APIKey                string `json:"api_key"`
-	TimeoutSeconds        int    `json:"timeout_seconds"`
-	RetryCount            int    `json:"retry_count"`
-	RetryIntervalSeconds  int    `json:"retry_interval_seconds"`
-	EnableCircuitBreaker  bool   `json:"enable_circuit_breaker"`
+	BaseURL              string `json:"base_url"`
+	APIKey               string `json:"api_key"`
+	TimeoutSeconds       int    `json:"timeout_seconds"`
+	RetryCount           int    `json:"retry_count"`
+	RetryIntervalSeconds int    `json:"retry_interval_seconds"`
+	EnableCircuitBreaker bool   `json:"enable_circuit_breaker"`
 }
 
 // QuotaConfig 配额配置
 type QuotaConfig struct {
-	DefaultStorageQuota    int64   `json:"default_storage_quota"`
-	DefaultFileCount       int64   `json:"default_file_count"`
-	CheckIntervalMinutes   int     `json:"check_interval_minutes"`
-	GraceBuffer           float64 `json:"grace_buffer"`
-	EnableWarnings        bool    `json:"enable_warnings"`
-	WarningThreshold      float64 `json:"warning_threshold"`
+	DefaultStorageQuota  int64   `json:"default_storage_quota"`
+	DefaultFileCount     int64   `json:"default_file_count"`
+	CheckIntervalMinutes int     `json:"check_interval_minutes"`
+	GraceBuffer          float64 `json:"grace_buffer"`
+	EnableWarnings       bool    `json:"enable_warnings"`
+	WarningThreshold     float64 `json:"warning_threshold"`
 }
 
 // Load 加载配置
@@ -120,11 +120,11 @@ func Load() (*Config, error) {
 			Debug:       getEnvBool("APP_DEBUG", true),
 		},
 		Server: ServerConfig{
-			Port:               getEnvInt("SERVER_PORT", 8002),
-			ReadTimeoutSeconds: getEnvInt("SERVER_READ_TIMEOUT", 30),
+			Port:                getEnvInt("SERVER_PORT", 8002),
+			ReadTimeoutSeconds:  getEnvInt("SERVER_READ_TIMEOUT", 30),
 			WriteTimeoutSeconds: getEnvInt("SERVER_WRITE_TIMEOUT", 30),
-			IdleTimeoutSeconds: getEnvInt("SERVER_IDLE_TIMEOUT", 120),
-			MaxHeaderBytes:     getEnvInt("SERVER_MAX_HEADER_BYTES", 1048576), // 1MB
+			IdleTimeoutSeconds:  getEnvInt("SERVER_IDLE_TIMEOUT", 120),
+			MaxHeaderBytes:      getEnvInt("SERVER_MAX_HEADER_BYTES", 1048576), // 1MB
 		},
 		Database: DatabaseConfig{
 			Host:                   getEnv("DB_HOST", "localhost"),
@@ -166,7 +166,7 @@ func Load() (*Config, error) {
 			ExpirationHours: getEnvInt("JWT_EXPIRATION_HOURS", 24),
 		},
 		UserService: UserServiceConfig{
-			BaseURL:              getEnv("USER_SERVICE_BASE_URL", ""),
+			BaseURL:              getEnv("USER_SERVICE_BASE_URL", "http://localhost:8001"),
 			APIKey:               getEnv("USER_SERVICE_API_KEY", ""),
 			TimeoutSeconds:       getEnvInt("USER_SERVICE_TIMEOUT_SECONDS", 30),
 			RetryCount:           getEnvInt("USER_SERVICE_RETRY_COUNT", 3),

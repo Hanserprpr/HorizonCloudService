@@ -13,11 +13,11 @@ import (
 
 // Router 路由管理器
 type Router struct {
-	engine       *gin.Engine
-	services     *services.Services
-	authMW       *middleware.AuthMiddleware
-	quotaMW      *middleware.QuotaMiddleware
-	handlers     *Handlers
+	engine   *gin.Engine
+	services *services.Services
+	authMW   *middleware.AuthMiddleware
+	quotaMW  *middleware.QuotaMiddleware
+	handlers *Handlers
 }
 
 // Handlers 所有处理器的集合
@@ -42,7 +42,7 @@ type RouterConfig struct {
 func NewRouter(config *RouterConfig) *Router {
 	// 创建Gin引擎
 	engine := gin.New()
-	
+
 	// 创建中间件
 	authMW := middleware.NewAuthMiddleware(config.AuthConfig)
 	quotaMW := middleware.NewQuotaMiddleware(config.QuotaConfig, config.UserServiceClient, config.Repository.File)
@@ -87,23 +87,23 @@ func (r *Router) setupMiddleware() {
 		if origin == "" {
 			origin = "*"
 		}
-		
+
 		c.Header("Access-Control-Allow-Origin", origin)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, X-Requested-With")
 		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Max-Age", "86400") // 24小时缓存预检结果
-		
+
 		// 只在有实际X-Request-ID时才暴露
 		if requestID := c.GetHeader("X-Request-ID"); requestID != "" {
 			c.Header("Access-Control-Expose-Headers", "X-Request-ID")
 		}
-		
+
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
 		}
-		
+
 		c.Next()
 	})
 
@@ -111,16 +111,16 @@ func (r *Router) setupMiddleware() {
 	r.engine.Use(func(c *gin.Context) {
 		// 为每个请求设置超时
 		timeout := 30 * time.Second
-		
+
 		// 对于上传请求，设置更长的超时时间
-		if c.Request.URL.Path == "/api/v1/upload/chunk" || 
-		   c.Request.URL.Path == "/api/v1/upload/simple" {
+		if c.Request.URL.Path == "/api/v1/upload/chunk" ||
+			c.Request.URL.Path == "/api/v1/upload/simple" {
 			timeout = 5 * time.Minute
 		}
-		
+
 		// 应用超时（示例实现）
 		_ = timeout
-		
+
 		c.Request = c.Request.WithContext(c.Request.Context())
 		c.Next()
 	})
@@ -132,17 +132,17 @@ func (r *Router) setupMiddleware() {
 			c.Next()
 			return
 		}
-		
+
 		requestID := c.GetHeader("X-Request-ID")
 		if requestID == "" {
 			requestID = generateRequestID()
 		}
-		
+
 		c.Set("request_id", requestID)
-		
+
 		// 只在成功处理请求后才设置响应头
 		c.Next()
-		
+
 		// 检查请求是否成功完成
 		if c.Writer.Status() < 400 {
 			c.Header("X-Request-ID", requestID)
@@ -166,13 +166,13 @@ func (r *Router) setupRoutes() {
 	{
 		// 文件相关路由
 		r.setupFileRoutes(authenticated)
-		
+
 		// 上传相关路由
 		r.setupUploadRoutes(authenticated)
-		
+
 		// 文件夹相关路由
 		r.setupFolderRoutes(authenticated)
-		
+
 		// 缩略图相关路由
 		r.setupThumbnailRoutes(authenticated)
 
@@ -294,6 +294,7 @@ func (r *Router) setupFolderRoutes(api *gin.RouterGroup) {
 		folders.GET("/:id", r.handlers.Folder.GetFolder)
 		folders.PUT("/:id", r.handlers.Folder.UpdateFolder)
 		folders.DELETE("/:id", r.handlers.Folder.DeleteFolder)
+		folders.GET("/show", r.handlers.Folder.GetFolderRecommend)
 
 		// 文件夹操作
 		folders.PUT("/:id/move", r.handlers.Folder.MoveFolder)
@@ -370,7 +371,7 @@ func (r *Router) setupAdminRoutes(api *gin.RouterGroup) {
 	// 系统统计
 	api.GET("/system/stats", r.handlers.Health.Stats)
 	api.GET("/system/metrics", r.handlers.Health.Metrics)
-	
+
 	// 管理员文件统计（匹配前端期望的格式）
 	api.GET("/files/stats/storage", r.handlers.File.GetAdminFileStats)
 }
@@ -388,7 +389,7 @@ func (r *Router) handleAuthPlaceholder(c *gin.Context) {
 		"code":    501,
 		"message": "Authentication endpoint should be handled by user service",
 		"error": gin.H{
-			"type": "NOT_IMPLEMENTED",
+			"type":        "NOT_IMPLEMENTED",
 			"description": "This endpoint is implemented by the user service",
 		},
 	})
