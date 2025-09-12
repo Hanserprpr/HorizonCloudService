@@ -124,6 +124,7 @@ const FileSearch: React.FC<FileSearchProps> = ({
 
   // 处理排序变化
   const handleSortChange = (sortValue: string) => {
+    if (!sortValue || typeof sortValue !== 'string') return;
     const [sort_by, sort_order] = sortValue.split('_').slice(-2);
     updateParams({
       sort_by: sortValue.replace(`_${sort_order}`, ''),

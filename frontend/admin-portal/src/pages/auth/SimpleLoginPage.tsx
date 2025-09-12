@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Form, Input, Button, Card, Typography, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Navigate } from 'react-router-dom';
+import { AuthService } from '@services/authService';
 
 const { Title, Text } = Typography;
 
 interface LoginForm {
-  username: string;
+  student_id: string;
   password: string;
 }
 
@@ -15,27 +16,37 @@ const SimpleLoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // 简化的登录处理
+  // 真实API登录处理
   const handleSubmit = async (values: LoginForm) => {
     setLoading(true);
     
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('🚀 提交登录请求:', values);
       
-      if (values.username === 'admin' && values.password === 'admin123') {
-        message.success('登录成功');
-        localStorage.setItem('simple-auth', 'true');
-        setIsAuthenticated(true);
-      } else {
-        message.error('用户名或密码错误');
-        form.setFields([
-          { name: 'username', errors: [''] },
-          { name: 'password', errors: ['用户名或密码错误'] },
-        ]);
-      }
-    } catch (error) {
-      message.error('登录失败，请重试');
+      // 调用真实API
+      const response = await AuthService.login(values);
+      
+      console.log('✅ 登录响应:', response);
+      
+      // 存储认证信息
+      localStorage.setItem('auth-token', response.access_token);
+      localStorage.setItem('refresh-token', response.refresh_token);
+      localStorage.setItem('user-info', JSON.stringify(response.user));
+      localStorage.setItem('simple-auth', 'true');
+      
+      message.success('登录成功');
+      setIsAuthenticated(true);
+      
+    } catch (error: any) {
+      console.error('❌ 登录错误:', error);
+      
+      const errorMessage = error.response?.data?.message || error.message || '登录失败';
+      message.error(errorMessage);
+      
+      form.setFields([
+        { name: 'student_id', errors: [''] },
+        { name: 'password', errors: [errorMessage] },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -75,15 +86,15 @@ const SimpleLoginPage: React.FC = () => {
             layout="vertical"
           >
             <Form.Item
-              name="username"
+              name="student_id"
               rules={[
-                { required: true, message: '请输入用户名!' },
-                { min: 3, message: '用户名至少3个字符!' },
+                { required: true, message: '请输入学生ID!' },
+                { min: 3, message: '学生ID至少3个字符!' },
               ]}
             >
               <Input
                 prefix={<UserOutlined />}
-                placeholder="用户名"
+                placeholder="学生ID"
                 autoComplete="username"
               />
             </Form.Item>

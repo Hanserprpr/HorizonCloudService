@@ -139,14 +139,19 @@ export const useDeleteFile = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: fileService.deleteFile,
+    mutationFn: (fileId: number) => {
+      console.log('🔥 useDeleteFile.mutationFn 被调用，fileId:', fileId);
+      return fileService.deleteFile(fileId);
+    },
     onSuccess: () => {
+      console.log('✅ useDeleteFile.onSuccess 删除成功');
       message.success('文件删除成功');
       // 更新相关缓存
       queryClient.invalidateQueries({ queryKey: ['files'] });
       queryClient.invalidateQueries({ queryKey: ['folder-contents'] });
     },
     onError: (error: any) => {
+      console.log('❌ useDeleteFile.onError 删除失败:', error);
       message.error(error.message || '删除文件失败');
     },
   });
@@ -243,7 +248,7 @@ export const useBatchOperation = () => {
 export const useThumbnails = (fileIds: number[]) => {
   return useQuery({
     queryKey: ['thumbnails', fileIds],
-    queryFn: () => fileService.getThumbnails(fileIds),
+    queryFn: () => fileService.getMultipleThumbnails(fileIds),
     enabled: fileIds.length > 0,
     staleTime: 10 * 60 * 1000, // 10分钟
     retry: 1,

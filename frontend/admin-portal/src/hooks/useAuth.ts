@@ -14,11 +14,11 @@ const mockApiCall = {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     // 模拟登录验证
-    if (credentials.username === 'admin' && credentials.password === 'admin123') {
+    if (credentials.student_id === 'admin' && credentials.password === 'admin123') {
       return {
         user: {
           id: 1,
-          username: 'admin',
+          student_id: 'admin',
           email: 'admin@example.com',
           display_name: '系统管理员',
           status: 1,
@@ -42,7 +42,7 @@ const mockApiCall = {
     await new Promise(resolve => setTimeout(resolve, 500));
     return {
       id: 1,
-      username: 'admin',
+      student_id: 'admin',
       email: 'admin@example.com',
       display_name: '系统管理员',
       status: 1,

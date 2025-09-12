@@ -15,6 +15,7 @@ import {
   Input,
   message,
   Progress,
+  App,
 } from 'antd';
 import {
   MoreOutlined,
@@ -76,10 +77,44 @@ const FileList: React.FC<FileListProps> = ({
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [renameItem, setRenameItem] = useState<FileItem | FolderItem | null>(null);
   const [newName, setNewName] = useState('');
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteItem, setDeleteItem] = useState<FileItem | FolderItem | null>(null);
+  
+  // 使用Ant Design hooks来访问modal（保留作为备用方案）
+  const { modal } = App.useApp();
 
   // 判断是否为文件夹
   const isFolder = (item: FileItem | FolderItem): item is FolderItem => {
     return 'folder_type' in item || !('content_type' in item);
+  };
+
+  // 处理菜单点击
+  const handleMenuClick = (item: FileItem | FolderItem, key: string) => {
+    console.log('🔍 handleMenuClick 被调用，key:', key, 'item:', item);
+    
+    switch (key) {
+      case 'rename':
+        setRenameItem(item);
+        setNewName(isFolder(item) ? item.name : (item as FileItem).file_name);
+        setRenameModalVisible(true);
+        break;
+      case 'copy':
+        onCopy?.(item);
+        break;
+      case 'move':
+        onMove?.(item);
+        break;
+      case 'info':
+        onShowInfo?.(item);
+        break;
+      case 'delete':
+        console.log('🗑️ 删除菜单项点击，准备显示确认对话框');
+        setDeleteItem(item);
+        setDeleteModalVisible(true);
+        break;
+      default:
+        console.log('❌ 未知菜单项:', key);
+    }
   };
 
   // 获取操作菜单
@@ -89,29 +124,21 @@ const FileList: React.FC<FileListProps> = ({
         key: 'rename',
         icon: <EditOutlined />,
         label: '重命名',
-        onClick: () => {
-          setRenameItem(item);
-          setNewName(isFolder(item) ? item.name : (item as FileItem).file_name);
-          setRenameModalVisible(true);
-        },
       },
       {
         key: 'copy',
         icon: <CopyOutlined />,
         label: '复制',
-        onClick: () => onCopy?.(item),
       },
       {
         key: 'move',
         icon: <ScissorOutlined />,
         label: '移动',
-        onClick: () => onMove?.(item),
       },
       {
         key: 'info',
         icon: <InfoCircleOutlined />,
         label: '详细信息',
-        onClick: () => onShowInfo?.(item),
       },
       {
         type: 'divider' as const,
@@ -121,16 +148,6 @@ const FileList: React.FC<FileListProps> = ({
         icon: <DeleteOutlined />,
         label: '删除',
         danger: true,
-        onClick: () => {
-          Modal.confirm({
-            title: `确认删除${isFolder(item) ? '文件夹' : '文件'}?`,
-            content: `确定要删除 "${isFolder(item) ? item.name : (item as FileItem).file_name}" 吗？此操作不可撤销。`,
-            okText: '确认删除',
-            okType: 'danger',
-            cancelText: '取消',
-            onOk: () => onDelete?.(item),
-          });
-        },
       },
     ];
 
@@ -169,6 +186,23 @@ const FileList: React.FC<FileListProps> = ({
     setRenameModalVisible(false);
     setRenameItem(null);
     setNewName('');
+  };
+
+  // 处理删除确认
+  const handleDeleteConfirm = () => {
+    console.log('✅ 确认删除按钮点击');
+    if (deleteItem) {
+      onDelete?.(deleteItem);
+    }
+    setDeleteModalVisible(false);
+    setDeleteItem(null);
+  };
+
+  // 处理删除取消
+  const handleDeleteCancel = () => {
+    console.log('❌ 取消删除操作');
+    setDeleteModalVisible(false);
+    setDeleteItem(null);
   };
 
   // 列表视图的列定义
@@ -234,7 +268,7 @@ const FileList: React.FC<FileListProps> = ({
           return <Tag color="blue">文件夹</Tag>;
         }
         const fileItem = item as FileItem;
-        const extension = fileItem.file_name.split('.').pop()?.toLowerCase();
+        const extension = fileItem.file_name?.split('.').pop()?.toLowerCase();
         return <Tag color="default">{extension || '未知'}</Tag>;
       },
     },
@@ -253,7 +287,10 @@ const FileList: React.FC<FileListProps> = ({
       align: 'center',
       render: (_, item) => (
         <Dropdown
-          menu={{ items: getActionMenu(item) }}
+          menu={{ 
+            items: getActionMenu(item),
+            onClick: ({ key }) => handleMenuClick(item, key)
+          }}
           trigger={['click']}
           placement="bottomRight"
         >
@@ -267,7 +304,7 @@ const FileList: React.FC<FileListProps> = ({
   const renderGridView = () => (
     <Row gutter={[16, 16]}>
       {files.map((item) => (
-        <Col xs={12} sm={8} md={6} lg={4} xl={3} key={item.id}>
+        <Col xs={12} sm={8} md={6} lg={4} xl={3} key={`grid-item-${item.id}`}>
           <Card
             hoverable
             size="small"
@@ -294,7 +331,7 @@ const FileList: React.FC<FileListProps> = ({
             }
             actions={[
               <Checkbox
-                key="select"
+                key={`grid-select-${item.id}`}
                 checked={selectedIds.includes(item.id)}
                 onChange={(e) => {
                   const newSelectedIds = e.target.checked
@@ -305,8 +342,11 @@ const FileList: React.FC<FileListProps> = ({
                 onClick={(e) => e.stopPropagation()}
               />,
               <Dropdown
-                key="more"
-                menu={{ items: getActionMenu(item) }}
+                key={`grid-more-${item.id}`}
+                menu={{ 
+                  items: getActionMenu(item),
+                  onClick: ({ key }) => handleMenuClick(item, key)
+                }}
                 trigger={['click']}
                 placement="bottomRight"
               >
@@ -355,7 +395,7 @@ const FileList: React.FC<FileListProps> = ({
     <div>
       {files.map((item) => (
         <Card
-          key={item.id}
+          key={`detail-item-${item.id}`}
           size="small"
           style={{ marginBottom: 8 }}
           className={selectedIds.includes(item.id) ? 'file-card-selected' : ''}
@@ -405,7 +445,10 @@ const FileList: React.FC<FileListProps> = ({
             </Col>
             <Col flex="none">
               <Dropdown
-                menu={{ items: getActionMenu(item) }}
+                menu={{ 
+                  items: getActionMenu(item),
+                  onClick: ({ key }) => handleMenuClick(item, key)
+                }}
                 trigger={['click']}
                 placement="bottomRight"
               >
@@ -492,6 +535,25 @@ const FileList: React.FC<FileListProps> = ({
           placeholder={`请输入新的${renameItem && isFolder(renameItem) ? '文件夹' : '文件'}名称`}
           onPressEnter={handleRename}
         />
+      </Modal>
+
+      {/* 删除确认模态框 */}
+      <Modal
+        title={`确认删除${deleteItem && isFolder(deleteItem) ? '文件夹' : '文件'}?`}
+        open={deleteModalVisible}
+        onOk={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        okText="确认删除"
+        okType="danger"
+        cancelText="取消"
+        width={400}
+      >
+        <p>
+          确定要删除 "{deleteItem && (isFolder(deleteItem) ? deleteItem.name : (deleteItem as FileItem).file_name)}" 吗？
+        </p>
+        <p style={{ color: '#ff4d4f', fontSize: '14px', marginTop: '8px' }}>
+          此操作不可撤销。
+        </p>
       </Modal>
 
       <style jsx>{`

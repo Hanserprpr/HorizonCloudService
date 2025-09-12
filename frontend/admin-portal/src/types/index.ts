@@ -25,7 +25,7 @@ export interface PaginatedResponse<T> {
 // 用户相关类型
 export interface User {
   id: number;
-  username: string;
+  student_id: string;
   email: string;
   display_name?: string;
   status: number;
@@ -38,7 +38,7 @@ export interface User {
 }
 
 export interface LoginForm {
-  username: string;
+  student_id: string;
   password: string;
   remember?: boolean;
 }
@@ -51,7 +51,7 @@ export interface LoginResponse {
 }
 
 export interface CreateUserRequest {
-  username: string;
+  student_id: string;
   email: string;
   password: string;
   display_name?: string;
@@ -61,7 +61,7 @@ export interface CreateUserRequest {
 }
 
 export interface UpdateUserRequest {
-  username?: string;
+  student_id?: string;
   email?: string;
   display_name?: string;
   role?: string;

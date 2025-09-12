@@ -37,7 +37,7 @@ const LoginPage: React.FC = () => {
       // 如果是认证错误，高亮表单字段
       if (errorInfo.type === 'auth' || errorInfo.status === 401) {
         form.setFields([
-          { name: 'username', errors: [''] },
+          { name: 'student_id', errors: [''] },
           { name: 'password', errors: [errorInfo.message] },
         ]);
       } else if (errorInfo.type === 'validation') {
@@ -69,15 +69,15 @@ const LoginPage: React.FC = () => {
             layout="vertical"
           >
             <Form.Item
-              name="username"
+              name="student_id"
               rules={[
-                { required: true, message: '请输入用户名!' },
-                { min: 3, message: '用户名至少3个字符!' },
+                { required: true, message: '请输入学生ID!' },
+                { min: 3, message: '学生ID至少3个字符!' },
               ]}
             >
               <Input
                 prefix={<UserOutlined />}
-                placeholder="用户名"
+                placeholder="学生ID"
                 autoComplete="username"
               />
             </Form.Item>

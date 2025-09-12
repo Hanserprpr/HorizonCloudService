@@ -229,11 +229,14 @@ const FilesPage: React.FC = () => {
 
   // 处理删除
   const handleDelete = (item: FileItem | FolderItem) => {
+    console.log('🗑️ FilesPage.handleDelete 被调用，item:', item);
     if ('content_type' in item) {
       // 删除文件
+      console.log('📄 删除文件，ID:', item.id);
       deleteFileMutation.mutate(item.id);
     } else {
       // 删除文件夹
+      console.log('📁 删除文件夹，ID:', item.id);
       deleteFolderMutation.mutate(item.id);
     }
   };

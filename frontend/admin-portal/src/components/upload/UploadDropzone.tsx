@@ -136,7 +136,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
       }
 
       // 检查文件类型 (如果指定了accept)
-      if (accept !== '*' && accept !== '') {
+      if (accept && accept !== '*' && accept !== '') {
         const acceptTypes = accept.split(',').map(type => type.trim());
         const isAcceptable = acceptTypes.some(acceptType => {
           if (acceptType.startsWith('.')) {

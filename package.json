@@ -28,7 +28,8 @@
   "author": "HorizonCloudService Team",
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.11.0"
+    "axios": "^1.11.0",
+    "puppeteer": "^24.20.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.0"

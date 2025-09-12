@@ -1,6 +1,10 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
+# ==============================================================================
+# HorizonCloudService - Comprehensive .gitignore
+# ==============================================================================
+
+# ==============================================================================
+# Go (Golang) specific
+# ==============================================================================
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -17,21 +21,166 @@ coverage.*
 *.coverprofile
 profile.cov
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Dependency directories
+vendor/
 
-# Go workspace file
+# Go workspace files
 go.work
 go.work.sum
 
-# env file
-.env
+# ==============================================================================
+# Node.js specific
+# ==============================================================================
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# Editor/IDE
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons
+build/Release
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# ==============================================================================
+# Database files
+# ==============================================================================
+*.db
+*.sqlite
+*.sqlite3
+file_service.db
+
+# ==============================================================================
+# Log files
+# ==============================================================================
+*.log
+logs/
+*.log.*
+log/
+
+# ==============================================================================
+# Environment and Configuration files
+# ==============================================================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+config.yaml
+*.yaml.local
+*.json.local
+
+# ==============================================================================
+# Build and Distribution
+# ==============================================================================
+dist/
+build/
+out/
+*.tar.gz
+*.zip
+*.rar
+
+# ==============================================================================
+# Temporary and Cache files
+# ==============================================================================
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ==============================================================================
+# Editor/IDE specific
+# ==============================================================================
 .idea/
 .vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
 
+# ==============================================================================
+# Storage and Upload directories
+# ==============================================================================
+storage/
+uploads/
+files/
+
+# ==============================================================================
+# Project specific files
+# ==============================================================================
 CLAUDE.md
+archive/
 
-#config
-config.yaml
+# ==============================================================================
+# Testing and Development
+# ==============================================================================
+# Test artifacts
+*.test.js
+*.spec.js
+test-results/
+
+# Mock and temporary files
+mock-*
+test-*
+*.mock
+
+# ==============================================================================
+# OS generated files
+# ==============================================================================
+# Windows
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.AppleDouble
+.LSOverride
+Icon?
+
+# Linux
+*~
+.fuse_hidden*
+.nfs*
+
+# ==============================================================================
+# Security and Keys
+# ==============================================================================
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+secrets/
+keys/

@@ -84,7 +84,7 @@ const FileIcon: React.FC<FileIconProps> = ({
     }
 
     // 使用文件扩展名判断
-    if (fileName) {
+    if (fileName && typeof fileName === 'string') {
       const extension = fileName.toLowerCase().split('.').pop();
       
       switch (extension) {

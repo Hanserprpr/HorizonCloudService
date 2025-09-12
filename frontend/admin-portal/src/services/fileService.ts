@@ -40,7 +40,16 @@ export class FileService {
 
   // 删除文件
   static async deleteFile(fileId: number): Promise<void> {
-    await fileApiClient.delete(`/api/v1/files/${fileId}`);
+    console.log('🌐 FileService.deleteFile 发起API调用，fileId:', fileId);
+    console.log('🌐 API URL:', `/api/v1/files/${fileId}`);
+    try {
+      const response = await fileApiClient.delete(`/api/v1/files/${fileId}`);
+      console.log('🌐 FileService.deleteFile API调用成功:', response);
+      return response.data;
+    } catch (error) {
+      console.log('🌐 FileService.deleteFile API调用失败:', error);
+      throw error;
+    }
   }
 
   // 批量删除文件
@@ -57,10 +66,16 @@ export class FileService {
   }
 
   // 复制文件
-  static async copyFile(fileId: number, targetFolderId?: number): Promise<FileItem> {
-    const response = await fileApiClient.post<FileItem>(`/api/v1/files/${fileId}/copy`, {
-      folder_id: targetFolderId,
-    });
+  static async copyFile(fileId: number, targetFolderId?: number, newName?: string): Promise<FileItem> {
+    const requestData: any = {};
+    if (targetFolderId !== undefined) {
+      requestData.folder_id = targetFolderId;
+    }
+    if (newName) {
+      requestData.new_name = newName;
+    }
+    
+    const response = await fileApiClient.post<FileItem>(`/api/v1/files/${fileId}/copy`, requestData);
     return response.data;
   }
 
@@ -110,6 +125,12 @@ export class FileService {
   // 删除文件夹
   static async deleteFolder(folderId: number): Promise<void> {
     await fileApiClient.delete(`/api/v1/folders/${folderId}`);
+  }
+
+  // 获取单个文件夹详情
+  static async getFolder(folderId: number): Promise<FolderItem> {
+    const response = await fileApiClient.get<FolderItem>(`/api/v1/folders/${folderId}`);
+    return response.data;
   }
 
   // 获取文件夹内容
@@ -206,10 +227,28 @@ export class FileService {
 
   // ============ 缩略图管理 ============
 
-  // 获取缩略图列表
+  // 获取单个文件的缩略图列表
   static async getThumbnails(fileId: number): Promise<Thumbnail[]> {
     const response = await fileApiClient.get<Thumbnail[]>(`/api/v1/thumbnails/${fileId}`);
     return response.data;
+  }
+
+  // 获取多个文件的缩略图列表
+  static async getMultipleThumbnails(fileIds: number[]): Promise<Record<number, Thumbnail[]>> {
+    const promises = fileIds.map(async (fileId) => {
+      try {
+        const thumbnails = await this.getThumbnails(fileId);
+        return { fileId, thumbnails };
+      } catch (error) {
+        return { fileId, thumbnails: [] };
+      }
+    });
+    
+    const results = await Promise.all(promises);
+    return results.reduce((acc, { fileId, thumbnails }) => {
+      acc[fileId] = thumbnails;
+      return acc;
+    }, {} as Record<number, Thumbnail[]>);
   }
 
   // 生成缩略图
