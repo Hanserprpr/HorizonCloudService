@@ -38,12 +38,12 @@ func (s *uploadService) InitiateUpload(ctx context.Context, req *InitiateUploadR
 	if err := s.utils.ValidateFileName(req.FileName); err != nil {
 		return nil, err
 	}
-	
+
 	// 验证文件大小
 	if req.Size <= 0 {
 		return nil, NewServiceError("InvalidFileSize", "file size must be greater than 0", nil)
 	}
-	
+
 	// 检查文件夹权限 (跳过根目录 folder_id = 0)
 	if req.FolderID != nil && *req.FolderID != 0 {
 		folder, err := s.repo.Folder.GetByID(ctx, *req.FolderID)
@@ -54,25 +54,25 @@ func (s *uploadService) InitiateUpload(ctx context.Context, req *InitiateUploadR
 			return nil, NewServiceError("PermissionDenied", "access denied to target folder", nil)
 		}
 	}
-	
+
 	// 设置默认分片大小 (5MB)
 	chunkSize := req.ChunkSize
 	if chunkSize <= 0 {
 		chunkSize = 5 * 1024 * 1024 // 5MB
 	}
-	
+
 	// 计算分片数量
 	totalChunks := int(math.Ceil(float64(req.Size) / float64(chunkSize)))
 	if totalChunks > 10000 { // 限制最大分片数
 		return nil, NewServiceError("TooManyChunks", "file too large or chunk size too small", nil)
 	}
-	
+
 	// 生成会话ID
 	sessionID := s.generateSessionID()
-	
+
 	// 提取文件扩展名
 	extension := s.utils.ExtractExtension(req.FileName)
-	
+
 	// 创建上传会话
 	session := &models.UploadSession{
 		SessionID:   sessionID,
@@ -87,12 +87,9 @@ func (s *uploadService) InitiateUpload(ctx context.Context, req *InitiateUploadR
 		Progress:    0,
 		ExpiresAt:   time.Now().Add(24 * time.Hour), // 24小时过期
 	}
-	
-	// 如果是单文件上传，直接处理
-	if totalChunks == 1 {
-		session.Status = models.UploadStatusInitialized
-	} else {
-		// 初始化多分片上传
+
+	// 如果是多分片上传，初始化分片上传
+	if totalChunks > 1 {
 		storagePath := s.utils.GenerateStoragePath(req.UserID, "", extension)
 		uploadResult, err := s.storage.InitiateMultipartUpload(ctx, storagePath, &storage.MultipartUploadOptions{
 			ContentType: session.ContentType,
@@ -103,15 +100,16 @@ func (s *uploadService) InitiateUpload(ctx context.Context, req *InitiateUploadR
 		}
 		session.UploadID = uploadResult.UploadID
 	}
-	
+	// 无论单分片还是多分片，状态都保持为 UploadStatusUploading
+
 	if err := s.repo.Upload.CreateSession(ctx, session); err != nil {
 		return nil, NewServiceError("SessionCreateFailed", "failed to create upload session", err)
 	}
-	
+
 	// 生成预签名上传URL（如果存储支持）
 	var uploadURLs []string
 	// TODO: 实现预签名URL生成
-	
+
 	return &InitiateUploadResponse{
 		SessionID:   sessionID,
 		ChunkSize:   chunkSize,
@@ -128,33 +126,33 @@ func (s *uploadService) UploadChunk(ctx context.Context, req *UploadChunkRequest
 	if err != nil {
 		return nil, NewServiceError("SessionNotFound", "upload session not found", err)
 	}
-	
+
 	// 检查权限
 	if session.UserID != req.UserID {
 		return nil, NewServiceError("PermissionDenied", "access denied to upload session", nil)
 	}
-	
+
 	// 检查会话状态
 	if session.Status != models.UploadStatusUploading {
 		return nil, NewServiceError("InvalidSessionStatus", "upload session is not in uploading status", nil)
 	}
-	
+
 	// 检查会话是否过期
 	if time.Now().After(session.ExpiresAt) {
 		return nil, NewServiceError("SessionExpired", "upload session has expired", nil)
 	}
-	
+
 	// 验证分片索引
 	if req.ChunkIndex < 0 || req.ChunkIndex >= session.TotalChunks {
 		return nil, NewServiceError("InvalidChunkIndex", "chunk index out of range", nil)
 	}
-	
+
 	// 检查分片是否已存在
 	existingChunk, err := s.repo.Upload.GetChunk(ctx, req.SessionID, req.ChunkIndex)
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return nil, NewServiceError("ChunkCheckFailed", "failed to check existing chunk", err)
 	}
-	
+
 	if existingChunk != nil && existingChunk.Status == models.ChunkStatusCompleted {
 		return &UploadChunkResponse{
 			ChunkIndex: req.ChunkIndex,
@@ -162,26 +160,26 @@ func (s *uploadService) UploadChunk(ctx context.Context, req *UploadChunkRequest
 			Message:    "Chunk already uploaded",
 		}, nil
 	}
-	
+
 	// 计算分片哈希
 	chunkHash, reader, err := s.calculateChunkHash(req.ChunkData)
 	if err != nil {
 		return nil, NewServiceError("ChunkHashFailed", "failed to calculate chunk hash", err)
 	}
-	
+
 	// 验证分片哈希（如果提供）
 	if req.ChunkHash != "" && req.ChunkHash != chunkHash {
 		return nil, NewServiceError("ChunkHashMismatch", "chunk hash mismatch", nil)
 	}
-	
+
 	var etag string
 	var storagePath string
-	
+
 	if session.TotalChunks == 1 {
 		// 单文件上传
 		extension := s.utils.ExtractExtension(session.FileName)
 		storagePath = s.utils.GenerateStoragePath(session.UserID, chunkHash, extension)
-		
+
 		uploadResult, err := s.storage.Upload(ctx, storagePath, reader, req.ChunkSize, &storage.UploadOptions{
 			ContentType: session.ContentType,
 		})
@@ -193,14 +191,14 @@ func (s *uploadService) UploadChunk(ctx context.Context, req *UploadChunkRequest
 	} else {
 		// 分片上传
 		storagePath = s.utils.GenerateChunkPath(session.UserID, req.SessionID, req.ChunkIndex)
-		
+
 		uploadResult, err := s.storage.UploadPart(ctx, session.UploadID, storagePath, req.ChunkIndex+1, reader, req.ChunkSize)
 		if err != nil {
 			return nil, NewServiceError("ChunkUploadFailed", "failed to upload chunk", err)
 		}
 		etag = uploadResult.ETag
 	}
-	
+
 	// 创建或更新分片记录
 	chunk := &models.UploadChunk{
 		SessionID:  req.SessionID,
@@ -211,10 +209,10 @@ func (s *uploadService) UploadChunk(ctx context.Context, req *UploadChunkRequest
 		Status:     models.ChunkStatusCompleted,
 		TempPath:   storagePath,
 	}
-	
+
 	err = s.repo.GetDB().Transaction(func(tx *gorm.DB) error {
 		txRepo := s.repo.WithTx(tx)
-		
+
 		// 保存分片记录
 		if existingChunk != nil {
 			chunk.ID = existingChunk.ID
@@ -226,15 +224,15 @@ func (s *uploadService) UploadChunk(ctx context.Context, req *UploadChunkRequest
 				return err
 			}
 		}
-		
+
 		// 更新会话进度
 		return txRepo.Upload.UpdateSessionProgress(ctx, req.SessionID)
 	})
-	
+
 	if err != nil {
 		return nil, NewServiceError("ChunkSaveFailed", "failed to save chunk record", err)
 	}
-	
+
 	return &UploadChunkResponse{
 		ChunkIndex: req.ChunkIndex,
 		ETag:       etag,
@@ -259,14 +257,14 @@ func (s *uploadService) AbortUpload(ctx context.Context, sessionID string, userI
 	if err != nil {
 		return NewServiceError("SessionNotFound", "upload session not found", err)
 	}
-	
+
 	if session.UserID != userID {
 		return NewServiceError("PermissionDenied", "access denied to upload session", nil)
 	}
-	
+
 	return s.repo.GetDB().Transaction(func(tx *gorm.DB) error {
 		txRepo := s.repo.WithTx(tx)
-		
+
 		// 如果是分片上传，中止存储层的分片上传
 		if session.TotalChunks > 1 && session.UploadID != "" {
 			// 生成存储路径（用于中止操作）
@@ -277,12 +275,12 @@ func (s *uploadService) AbortUpload(ctx context.Context, sessionID string, userI
 				// TODO: 添加日志
 			}
 		}
-		
+
 		// 更新会话状态
 		if err := txRepo.Upload.FailSession(ctx, sessionID, "Upload aborted by user"); err != nil {
 			return err
 		}
-		
+
 		// 删除会话和分片记录
 		return txRepo.Upload.DeleteSession(ctx, sessionID)
 	})
@@ -294,11 +292,11 @@ func (s *uploadService) GetUploadSession(ctx context.Context, sessionID string, 
 	if err != nil {
 		return nil, NewServiceError("SessionNotFound", "upload session not found", err)
 	}
-	
+
 	if session.UserID != userID {
 		return nil, NewServiceError("PermissionDenied", "access denied to upload session", nil)
 	}
-	
+
 	return session, nil
 }
 
@@ -313,7 +311,7 @@ func (s *uploadService) GetUploadProgress(ctx context.Context, sessionID string,
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// 计算预估剩余时间
 	var estimatedTime int64
 	if session.Progress > 0 && session.Progress < 100 {
@@ -324,17 +322,17 @@ func (s *uploadService) GetUploadProgress(ctx context.Context, sessionID string,
 			estimatedTime = int64(remaining) / int64(time.Second)
 		}
 	}
-	
+
 	return &UploadProgressResponse{
-		SessionID:       sessionID,
-		FileName:        session.FileName,
-		TotalSize:       session.FileSize,
-		UploadedSize:    int64(float64(session.FileSize) * session.Progress / 100.0),
-		TotalChunks:     session.TotalChunks,
-		UploadedChunks:  session.UploadedChunks,
-		Progress:        session.Progress,
-		Status:          session.Status,
-		EstimatedTime:   estimatedTime,
+		SessionID:      sessionID,
+		FileName:       session.FileName,
+		TotalSize:      session.FileSize,
+		UploadedSize:   int64(float64(session.FileSize) * session.Progress / 100.0),
+		TotalChunks:    session.TotalChunks,
+		UploadedChunks: session.UploadedChunks,
+		Progress:       session.Progress,
+		Status:         session.Status,
+		EstimatedTime:  estimatedTime,
 	}, nil
 }
 
@@ -342,10 +340,10 @@ func (s *uploadService) GetUploadProgress(ctx context.Context, sessionID string,
 func (s *uploadService) BatchInitiateUpload(ctx context.Context, req *BatchInitiateUploadRequest) (*BatchInitiateUploadResponse, error) {
 	var sessions []InitiateUploadResponse
 	var failed []BatchError
-	
+
 	for i, fileReq := range req.Files {
 		fileReq.UserID = req.UserID
-		
+
 		resp, err := s.InitiateUpload(ctx, fileReq)
 		if err != nil {
 			failed = append(failed, BatchError{
@@ -356,7 +354,7 @@ func (s *uploadService) BatchInitiateUpload(ctx context.Context, req *BatchIniti
 			sessions = append(sessions, *resp)
 		}
 	}
-	
+
 	return &BatchInitiateUploadResponse{
 		Sessions: sessions,
 		Failed:   failed,
@@ -370,33 +368,33 @@ func (s *uploadService) ResumeUpload(ctx context.Context, sessionID string, user
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if session.Status == models.UploadStatusCompleted {
 		return nil, NewServiceError("UploadAlreadyCompleted", "upload already completed", nil)
 	}
-	
+
 	if session.Status == models.UploadStatusFailed {
 		return nil, NewServiceError("UploadFailed", "upload has failed, cannot resume", nil)
 	}
-	
+
 	// 获取已上传的分片
 	chunks, err := s.repo.Upload.GetSessionChunks(ctx, sessionID)
 	if err != nil {
 		return nil, NewServiceError("ChunkRetrieveFailed", "failed to retrieve uploaded chunks", err)
 	}
-	
+
 	// 计算下一个需要上传的分片
 	uploadedChunks := 0
 	nextChunkIndex := 0
 	chunkStatus := make([]bool, session.TotalChunks)
-	
+
 	for _, chunk := range chunks {
 		if chunk.Status == models.ChunkStatusCompleted {
 			uploadedChunks++
 			chunkStatus[chunk.ChunkIndex] = true
 		}
 	}
-	
+
 	// 找到第一个未上传的分片
 	for i, uploaded := range chunkStatus {
 		if !uploaded {
@@ -404,9 +402,9 @@ func (s *uploadService) ResumeUpload(ctx context.Context, sessionID string, user
 			break
 		}
 	}
-	
+
 	progress := float64(uploadedChunks) / float64(session.TotalChunks) * 100
-	
+
 	return &ResumeUploadResponse{
 		SessionID:      sessionID,
 		NextChunkIndex: nextChunkIndex,
@@ -439,16 +437,16 @@ func (s *uploadService) generateSessionID() string {
 func (s *uploadService) calculateChunkHash(reader io.Reader) (string, io.Reader, error) {
 	hash := md5.New()
 	teeReader := io.TeeReader(reader, hash)
-	
+
 	// 读取所有数据到内存（分片通常不大）
 	data, err := io.ReadAll(teeReader)
 	if err != nil {
 		return "", nil, err
 	}
-	
+
 	hashStr := hex.EncodeToString(hash.Sum(nil))
 	newReader := strings.NewReader(string(data))
-	
+
 	return hashStr, newReader, nil
 }
 
@@ -468,11 +466,11 @@ func (s *uploadService) PauseUpload(ctx context.Context, sessionID string, userI
 	if err != nil {
 		return err
 	}
-	
+
 	if session.Status != models.UploadStatusUploading {
 		return NewServiceError("InvalidSessionStatus", "cannot pause upload in current status", nil)
 	}
-	
+
 	session.Status = models.UploadStatusPaused
 	return s.repo.Upload.UpdateSession(ctx, session)
 }
@@ -483,11 +481,11 @@ func (s *uploadService) ResumeUploadFromPause(ctx context.Context, sessionID str
 	if err != nil {
 		return err
 	}
-	
+
 	if session.Status != models.UploadStatusPaused {
 		return NewServiceError("InvalidSessionStatus", "upload is not paused", nil)
 	}
-	
+
 	session.Status = models.UploadStatusUploading
 	return s.repo.Upload.UpdateSession(ctx, session)
 }
@@ -498,11 +496,11 @@ func (s *uploadService) GetUploadStatistics(ctx context.Context, userID uint) (*
 	if err != nil {
 		return nil, NewServiceError("StatsRetrieveFailed", "failed to retrieve upload sessions", err)
 	}
-	
+
 	stats := &UploadStatistics{
 		TotalSessions: len(sessions),
 	}
-	
+
 	for _, session := range sessions {
 		switch session.Status {
 		case models.UploadStatusCompleted:
@@ -514,17 +512,16 @@ func (s *uploadService) GetUploadStatistics(ctx context.Context, userID uint) (*
 		case models.UploadStatusPaused:
 			stats.PausedSessions++
 		}
-		
+
 		stats.TotalBytes += session.FileSize
 		if session.Status == models.UploadStatusCompleted {
 			stats.UploadedBytes += session.FileSize
 		}
 	}
-	
+
 	if stats.TotalBytes > 0 {
 		stats.SuccessRate = float64(stats.UploadedBytes) / float64(stats.TotalBytes) * 100
 	}
-	
+
 	return stats, nil
 }
-
